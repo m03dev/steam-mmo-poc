@@ -46,6 +46,22 @@ echo "==> GAME_VERSION in NetworkManager.gd set to $next"
 echo "==> exporting '$PRESET'"
 "$GODOT" --headless --path "$PROJECT_DIR" --export-release "$PRESET" "$BUILD_DIR/SteamMMO.exe" >/dev/null
 
+# --- Steam App ID --------------------------------------------------------------
+# The build runs as the App ID in steam_appid.txt, and SteamManager reads the copy
+# beside the executable first. Copying it into the build means the shipped file
+# cannot disagree with the repo, and say so out loud when it is still Valve's
+# shared test app - a build handed to other people must not be.
+appid_file="$PROJECT_DIR/steam_appid.txt"
+appid="$(tr -d '[:space:]' < "$appid_file" 2>/dev/null || echo '')"
+cp "$appid_file" "$BUILD_DIR/steam_appid.txt"
+if [ "$appid" = "480" ]; then
+	echo "!! App ID 480 (Spacewar): a local test build, not something to hand out." >&2
+elif [ -z "$appid" ]; then
+	echo "!! steam_appid.txt is empty - the build will fall back to 480 at runtime." >&2
+else
+	echo "==> shipping App ID $appid"
+fi
+
 # --- package -------------------------------------------------------------------
 mkdir -p "$DIST_DIR"
 zip_path="$DIST_DIR/SteamMMO_$next.zip"

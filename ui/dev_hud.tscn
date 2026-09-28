@@ -89,7 +89,15 @@ text = "PEERS"
 unique_name_in_owner = true
 theme_override_constants/separation = 1
 
-[node name="MenuButton" type="Button" parent="Margin/Panel/VBox"]
+[node name="Actions" type="HBoxContainer" parent="Margin/Panel/VBox"]
+theme_override_constants/separation = 6
+
+[node name="InviteButton" type="Button" parent="Margin/Panel/VBox/Actions"]
+unique_name_in_owner = true
+theme_override_font_sizes/font_size = 12
+text = "Invite friends"
+
+[node name="MenuButton" type="Button" parent="Margin/Panel/VBox/Actions"]
 unique_name_in_owner = true
 theme_override_font_sizes/font_size = 12
 text = "Menu"

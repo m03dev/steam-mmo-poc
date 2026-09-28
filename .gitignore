@@ -14,3 +14,6 @@ _shot.png
 _shot.png.import
 SteamMMO_windows.zip
 *.zip
+
+# Steam alpha upload config (names your account and app ids)
+tools/steam_alpha.env

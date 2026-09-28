@@ -31,6 +31,7 @@ var _peer_rows: Dictionary = {}
 
 func _ready() -> void:
 	%MenuButton.pressed.connect(_on_menu_pressed)
+	%InviteButton.pressed.connect(_on_invite_pressed)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -68,7 +69,9 @@ func _show_network() -> void:
 
 	if NetworkManager.current_lobby_id == 0:
 		_lobby_value.text = "no lobby"
+		%InviteButton.disabled = true
 		return
+	%InviteButton.disabled = not SteamManager.is_initialized
 	_lobby_value.text = "%s   %d   %d/%d" % [
 			NetworkManager.current_lobby_type,
 			NetworkManager.current_lobby_id,
@@ -174,3 +177,11 @@ func _on_menu_pressed() -> void:
 	NetworkManager.leave_lobby()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(START_SCENE)
+
+
+## Steam draws the friends list itself, so this is the whole invite feature: hand
+## Steam the lobby id and let it do the work. Nothing happens if there is no lobby
+## (the button is disabled then) or if Steam is down.
+func _on_invite_pressed() -> void:
+	if not NetworkManager.invite_friends():
+		_lobby_value.text = "nothing to invite to yet"

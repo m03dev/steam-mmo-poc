@@ -17,7 +17,21 @@ signal steam_initialized(success: bool)
 ## 480 = "Spacewar", Valve's public test app. It grants every Steam user access
 ## to SDR / P2P relaying for free, so we can test real multiplayer today with no
 ## port forwarding and without owning a real App ID yet.
-const APP_ID: int = 480
+##
+## It is only a DEFAULT. Every Spacewar user on Steam shares it, which is fine for
+## two developers testing and wrong for handing a build to friends: the App ID has
+## to be the game's own before a build leaves this machine. See `app_id` below.
+const DEFAULT_DEV_APP_ID: int = 480
+
+## The App ID this process is actually running as. Resolved before Steam init, from
+## the first of these that answers:
+##   1. `--appid=N`            a one-off run against a different app
+##   2. steam_appid.txt        beside the executable, then the project root
+##   3. 480                    the dev default
+## Kept out of the code so switching to the real app is a file change, not an edit
+## hunt: the Steam client hands a launched game its App ID, and a file is how you
+## tell GodotSteam the same thing when it is started directly.
+var app_id: int = DEFAULT_DEV_APP_ID
 
 ## ESteamAPIInitResult values, returned inside the dictionary from steamInitEx().
 ## NOTE: success is 0 here (not EResult's 1) because this is the *init* result
@@ -36,6 +50,43 @@ func _ready() -> void:
 	_initialize()
 
 
+## True when this process is talking to Valve's shared test app. Anything that
+## only makes sense for a real release -- a private lobby, a version shown to
+## friends -- keys off this rather than off a hardcoded 480 scattered around.
+func is_dev_app() -> bool:
+	return app_id == DEFAULT_DEV_APP_ID
+
+
+## Where the App ID comes from, in order. A command-line value wins so a run can be
+## pointed at a different app without editing files; after that the conventional
+## `steam_appid.txt`, beside the executable first (that is how a shipped build is
+## configured) and then in the project (that is how it is configured in the editor).
+func _resolve_app_id() -> int:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--appid="):
+			var from_arg: int = int(arg.trim_prefix("--appid="))
+			if from_arg > 0:
+				return from_arg
+	var exe_side: String = OS.get_executable_path().get_base_dir().path_join("steam_appid.txt")
+	for path: String in [exe_side, "res://steam_appid.txt"]:
+		var from_file: int = _read_app_id_file(path)
+		if from_file > 0:
+			return from_file
+	return DEFAULT_DEV_APP_ID
+
+
+func _read_app_id_file(path: String) -> int:
+	if not FileAccess.file_exists(path):
+		return 0
+	var text: String = FileAccess.get_file_as_string(path).strip_edges()
+	# Ignore anything that is not a plain positive integer, including the comments
+	# people leave in this file -- a malformed App ID must not silently become 480.
+	if not text.is_valid_int():
+		return 0
+	var value: int = int(text)
+	return value if value > 0 else 0
+
+
 func _initialize() -> void:
 	# The GDExtension registers a global `Steam` object. If it is missing the
 	# addon did not load (wrong platform binary, addon removed, etc.).
@@ -45,11 +96,13 @@ func _initialize() -> void:
 		steam_initialized.emit(false)
 		return
 
+	app_id = _resolve_app_id()
+
 	# embed_callbacks=false -> callbacks are NOT pumped for us, so we run
 	# Steam.run_callbacks() ourselves in _process(). Returns a dictionary:
 	#     { "status": int, "verbal": String }
 	# where status == INIT_OK (0) means everything worked.
-	var response: Dictionary = Steam.steamInitEx(APP_ID, false)
+	var response: Dictionary = Steam.steamInitEx(app_id, false)
 	var status: int = int(response.get("status", -1))
 	var verbal: String = str(response.get("verbal", ""))
 
@@ -57,7 +110,7 @@ func _initialize() -> void:
 		is_initialized = false
 		last_error = verbal if not verbal.is_empty() else "unknown error (status %d)" % status
 		if status == INIT_NO_STEAM_CLIENT:
-			push_warning("[SteamManager] Steam client is not running (App ID %d). " % APP_ID
+			push_warning("[SteamManager] Steam client is not running (App ID %d). " % app_id
 					+ "Start Steam and log in to test multiplayer; local code still runs.")
 		else:
 			push_error("[SteamManager] Steam init failed: " + last_error)
@@ -67,8 +120,9 @@ func _initialize() -> void:
 	is_initialized = true
 	steam_id = Steam.getSteamID()
 	persona_name = Steam.getPersonaName()
-	print("[SteamManager] OK | GodotSteam v%s | App ID %d | user '%s' (%d)" % [
-			Steam.get_godotsteam_version(), APP_ID, persona_name, steam_id])
+	print("[SteamManager] OK | GodotSteam v%s | App ID %d%s | user '%s' (%d)" % [
+			Steam.get_godotsteam_version(), app_id,
+			" (DEV: Spacewar)" if is_dev_app() else "", persona_name, steam_id])
 	steam_initialized.emit(true)
 
 

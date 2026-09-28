@@ -26,6 +26,12 @@ signal peer_connected(peer_id: int)
 signal peer_disconnected(peer_id: int)
 signal connection_failed
 
+## Someone asked us to join them: they picked "Join Game" for us in their friends
+## list, or accepted an invite we sent. `steam_id` is the friend; `accepted` is
+## false when we could not act on it (already hosting, say), so a caller can tell
+## "you are about to be in a game" from "nothing happened".
+signal join_invited(steam_id: int, lobby_id: int, accepted: bool)
+
 const MAX_MEMBERS: int = 8
 
 ## Steam lobby metadata keys (stored as strings inside the lobby's data).
@@ -76,10 +82,25 @@ const RESULT_OK: int = 1
 const TYPE_WORLD: String = "world"
 const TYPE_DUNGEON: String = "dungeon"
 
+## Which lobby visibility a session is created with. Friends-only is the right
+## default for a build handed to other people: a public Spacewar lobby is listed to
+## every Steam user, and this game's sessions are meant to be found by invite, not
+## by browsing. Overridable with --lobby-public / --lobby-friends.
+enum LobbyVisibility {
+	PUBLIC,
+	FRIENDS_ONLY,
+}
+
 var peer: SteamMultiplayerPeer = null
 var current_lobby_id: int = 0
 var current_lobby_type: String = ""
 var is_host: bool = false
+
+## Lobby visibility, resolved in _ready: the flag if one was given, otherwise
+## friends-only once this build is on its own App ID, and public while it is still
+## on Valve's shared test app (where every session is visible to strangers anyway,
+## so pretending otherwise would only hide our own test lobbies from ourselves).
+var lobby_visibility: LobbyVisibility = LobbyVisibility.PUBLIC
 
 ## Transport actually in use. The host picks it and publishes it in the lobby; a
 ## joiner reads the host's choice and matches it, so the two can never disagree.
@@ -108,6 +129,7 @@ func _ready() -> void:
 	# Identity first, so every log carries the build that produced it.
 	print("[NetworkManager] SteamMMO v%s | netcode protocol %d" % [GAME_VERSION, PROTOCOL_VERSION])
 	_parse_transport_args()
+	_resolve_lobby_visibility()
 	# MultiplayerAPI signal, not the peer's, so this survives every peer swap.
 	multiplayer.peer_connected.connect(_on_multiplayer_peer_connected)
 
@@ -116,6 +138,10 @@ func _ready() -> void:
 		Steam.lobby_created.connect(_on_steam_lobby_created)
 		Steam.lobby_joined.connect(_on_steam_lobby_joined)
 		Steam.lobby_match_list.connect(_on_steam_lobby_match_list)
+		# "Join Game" in a friend's Steam client, and invites arriving while we run:
+		# both mean "come here", and both carry the lobby id to go to.
+		Steam.join_requested.connect(_on_steam_join_requested)
+		Steam.lobby_invite.connect(_on_steam_lobby_invite)
 	# Godot-side signals: peer join/leave + connection state. These live on the
 	# default MultiplayerAPI and stay valid even as we swap the underlying peer.
 	var api: MultiplayerAPI = multiplayer
@@ -126,10 +152,43 @@ func _ready() -> void:
 	api.server_disconnected.connect(_on_server_disconnected)
 
 
+## Ask Steam to open its own "invite friends" overlay for the current session. Steam
+## draws the friends list and sends the invites, so we never build an invite UI and
+## never need a friends API: the invite lands in the friend's client, and accepting
+## it comes back to us (or to whoever is hosting) as join_requested.
+##
+## Returns false when there is nothing to invite to, so a button can say so instead
+## of silently doing nothing.
+func invite_friends() -> bool:
+	if not _require_steam("invite_friends"):
+		return false
+	if current_lobby_id == 0:
+		push_warning("[NetworkManager] Nothing to invite to: not in a lobby yet.")
+		return false
+	# The overlay invite dialog is only meaningful for a session Steam knows about,
+	# and it is how a friends-only lobby is entered: the invite grants access that a
+	# plain lobby-id paste would not.
+	Steam.activateGameOverlayInviteDialog(current_lobby_id)
+	print("[NetworkManager] Opened the Steam invite dialog for lobby %d." % current_lobby_id)
+	return true
+
+
+## Join a lobby someone pointed us at. Wraps the "leave first, then go" ordering so
+## an incoming invite is a single call from the UI's point of view.
+func join_invited_lobby(lobby_id: int) -> void:
+	if lobby_id <= 0:
+		return
+	if current_lobby_id != 0:
+		# Steam cannot be in two lobbies, and our peer is bound to the old one.
+		leave_lobby()
+	join_lobby(lobby_id)
+
+
 #region Public API -------------------------------------------------------------
 
-## Create a new PUBLIC lobby of `lobby_type` and host it. Result arrives via the
-## `lobby_created` / `lobby_create_failed` signals.
+## Create a new lobby of `lobby_type` and host it. Visibility follows
+## `lobby_visibility` (friends-only on a real App ID by default). Result arrives via
+## the `lobby_created` / `lobby_create_failed` signals.
 func create_lobby(lobby_type: String) -> void:
 	if not _require_steam("create_lobby"):
 		return
@@ -137,8 +196,12 @@ func create_lobby(lobby_type: String) -> void:
 		push_warning("[NetworkManager] Already in lobby %d; leave first." % current_lobby_id)
 		return
 	_pending_create_type = lobby_type
-	print("[NetworkManager] Creating public lobby (type='%s', max=%d)..." % [lobby_type, MAX_MEMBERS])
-	Steam.createLobby(Steam.LOBBY_TYPE_PUBLIC, MAX_MEMBERS)  # async
+	var steam_visibility: int = Steam.LOBBY_TYPE_FRIENDS_ONLY \
+			if lobby_visibility == LobbyVisibility.FRIENDS_ONLY else Steam.LOBBY_TYPE_PUBLIC
+	print("[NetworkManager] Creating %s lobby (type='%s', max=%d)..." % [
+			"friends-only" if lobby_visibility == LobbyVisibility.FRIENDS_ONLY else "public",
+			lobby_type, MAX_MEMBERS])
+	Steam.createLobby(steam_visibility, MAX_MEMBERS)  # async
 
 
 ## Join an existing lobby by its Steam lobby ID. Result arrives via the
@@ -195,6 +258,7 @@ func leave_lobby() -> void:
 	current_lobby_id = 0
 	current_lobby_type = ""
 	is_host = false
+	_clear_presence()
 	if was_in_lobby:
 		lobby_left.emit()
 
@@ -234,6 +298,85 @@ func get_lobby_ids() -> Array[int]:
 #endregion
 
 
+#region Visibility, presence and invites ----------------------------------------
+
+## Friends-only on a build that talks to its own App ID; public while we are still on
+## Valve's shared test app, where every lobby is visible to strangers regardless.
+## An explicit flag always wins.
+func _resolve_lobby_visibility() -> void:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg == "--lobby-public":
+			lobby_visibility = LobbyVisibility.PUBLIC
+			print("[NetworkManager] Lobby visibility: public (--lobby-public)")
+			return
+		if arg == "--lobby-friends":
+			lobby_visibility = LobbyVisibility.FRIENDS_ONLY
+			print("[NetworkManager] Lobby visibility: friends-only (--lobby-friends)")
+			return
+	var dev_app: bool = not Engine.has_singleton("Steam") or SteamManager.is_dev_app()
+	lobby_visibility = LobbyVisibility.PUBLIC if dev_app else LobbyVisibility.FRIENDS_ONLY
+	print("[NetworkManager] Lobby visibility: %s (%s)" % [
+			"public" if lobby_visibility == LobbyVisibility.PUBLIC else "friends-only",
+			"dev App ID %d" % SteamManager.app_id if dev_app else "own App ID %d" % SteamManager.app_id])
+
+
+## What this peer's friends see, and what makes "Join Game" appear for them.
+##
+## `connect` is the key Steam's client reads to offer joining: the value is the
+## launch string the Steam client would use, and for a lobby game Valve's convention
+## is "+connect_lobby <id>". Steam parses the id out of it and, when the friend
+## clicks Join Game, hands it back to the game as join_requested. Setting it is what
+## turns a private, friends-only session into one a friend can enter without ever
+## being told a lobby number.
+func _publish_presence(status: String) -> void:
+	if not SteamManager.is_initialized:
+		return
+	Steam.setRichPresence("status", status)
+	if current_lobby_id != 0:
+		Steam.setRichPresence("connect", "+connect_lobby %d" % current_lobby_id)
+
+
+## Drop the presence so a friend does not see "Join Game" for a session that no
+## longer exists -- a stale one is how you get a click that goes nowhere.
+func _clear_presence() -> void:
+	if not SteamManager.is_initialized:
+		return
+	Steam.clearRichPresence()
+
+
+## A friend picked "Join Game" for us. We are the invited side: all we do is go.
+func _on_steam_join_requested(lobby_id: int, steam_id: int) -> void:
+	print("[NetworkManager] Steam join request from %d for lobby %d." % [steam_id, lobby_id])
+	if lobby_id <= 0:
+		join_invited.emit(steam_id, lobby_id, false)
+		return
+	if current_lobby_id == lobby_id:
+		# Already there -- most likely our own invite coming back to us.
+		join_invited.emit(steam_id, lobby_id, true)
+		return
+	if is_host and current_lobby_id != 0:
+		# We are hosting and someone asked us to join them instead. Joining would
+		# drop everyone who came to us, so refuse and say so rather than quietly
+		# destroying the session we are in the middle of.
+		push_warning("[NetworkManager] Refusing to join lobby %d: hosting lobby %d." % [
+				lobby_id, current_lobby_id])
+		join_invited.emit(steam_id, lobby_id, false)
+		return
+	print("[NetworkManager] Accepting the invite: joining lobby %d." % lobby_id)
+	join_invited_lobby(lobby_id)
+	join_invited.emit(steam_id, lobby_id, true)
+
+
+## An invite someone sent us, seen while we are already running. Steam delivers the
+## same "come here" as join_requested when the player accepts in the overlay, but the
+## raw invite is useful in a log: it names the inviter even when the join fails.
+func _on_steam_lobby_invite(inviter: int, lobby_id: int, _game_id: int) -> void:
+	print("[NetworkManager] Invited to lobby %d by Steam user %d." % [lobby_id, inviter])
+
+
+#endregion
+
+
 #region Steam callback handlers ------------------------------------------------
 
 func _on_steam_lobby_created(connect_result: int, lobby_id: int) -> void:
@@ -253,6 +396,7 @@ func _on_steam_lobby_created(connect_result: int, lobby_id: int) -> void:
 	Steam.setLobbyData(lobby_id, KEY_PROTOCOL, str(PROTOCOL_VERSION))
 	Steam.setLobbyMemberLimit(lobby_id, MAX_MEMBERS)
 	Steam.setLobbyJoinable(lobby_id, true)
+	_publish_presence("Hosting '%s'" % current_lobby_type)
 	Steam.setLobbyMemberData(lobby_id, "name", SteamManager.persona_name)
 	_publish_member_build(lobby_id)
 	# The host decides how the socket is opened and the joiners follow, so only one
@@ -308,6 +452,7 @@ func _on_steam_lobby_joined(lobby_id: int, _permissions: int, _locked: bool, res
 	Steam.setLobbyMemberData(lobby_id, "name", SteamManager.persona_name)
 	_publish_member_build(lobby_id)
 	_report_host_build(lobby_id)
+	_publish_presence("In a '%s'" % current_lobby_type)
 	# Obey the host's transport choice, so a joiner needs no flags of its own.
 	if Steam.getLobbyData(lobby_id, KEY_TRANSPORT) == "canonical":
 		transport = Transport.CANONICAL

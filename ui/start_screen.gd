@@ -31,6 +31,9 @@ func _ready() -> void:
 	NetworkManager.lobby_joined.connect(_on_lobby_ready)
 	NetworkManager.lobby_create_failed.connect(_on_session_failed)
 	NetworkManager.lobby_join_failed.connect(_on_session_failed)
+	# A friend pressed "Join Game" for us while we were still sitting on this menu.
+	# That is a complete instruction, so it bypasses the menu entirely.
+	NetworkManager.join_invited.connect(_on_join_invited)
 	SteamManager.steam_initialized.connect(_on_steam_initialized)
 
 	_launch_action = _read_launch_action()
@@ -105,6 +108,17 @@ func _on_lobby_ready(_lobby_id: int) -> void:
 
 func _on_session_failed(reason: String) -> void:
 	_set_status(reason)
+
+
+## Someone invited us (or we accepted an invite) and Steam told us where to go.
+## `accepted` is false when we could not act on it -- for instance when we are
+## already hosting and joining would have dropped our own players.
+func _on_join_invited(_steam_id: int, lobby_id: int, accepted: bool) -> void:
+	if not accepted:
+		_set_status("Invite ignored: already in a session of our own.")
+		return
+	_set_status("Joining a friend (lobby %d)..." % lobby_id)
+	# _on_lobby_ready does the handover once Steam confirms, so nothing to do here.
 
 
 func _enter_game() -> void:
