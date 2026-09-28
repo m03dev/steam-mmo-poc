@@ -52,16 +52,21 @@ func _is_local_owner() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_local_owner():
 		return
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		_cam_yaw -= event.relative.x * MOUSE_SENSITIVITY
-		_cam_pitch = clampf(_cam_pitch - event.relative.y * MOUSE_SENSITIVITY, PITCH_MIN, PITCH_MAX)
+	if event is InputEventMouseMotion:
+		var mm: InputEventMouseMotion = event
+		# Look with the mouse while it is grabbed; if the cursor has been freed
+		# (Esc, to click the debug buttons) hold the right button to look instead.
+		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			_cam_yaw -= mm.relative.x * MOUSE_SENSITIVITY
+			_cam_pitch = clampf(_cam_pitch - mm.relative.y * MOUSE_SENSITIVITY, PITCH_MIN, PITCH_MAX)
 	elif event.is_action_pressed("ui_cancel"):
 		# Esc releases the mouse so the debug lobby buttons can be clicked.
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
-		if mb.pressed and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
-			# Click anywhere that is not UI to grab the mouse back.
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT \
+				and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
+			# Left-click anywhere that is not UI to grab the mouse back.
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 

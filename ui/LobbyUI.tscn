@@ -9,7 +9,7 @@ script = ExtResource("1_lobby")
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 480.0
-offset_bottom = 340.0
+offset_bottom = 372.0
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
@@ -75,3 +75,6 @@ text = "Leave Lobby"
 unique_name_in_owner = true
 text = "Auto-join open World on launch"
 button_pressed = true
+
+[node name="Hint" type="Label" parent="Margin/Box"]
+text = "WASD = move   |   Mouse = look around   |   Esc = free cursor (click world to re-grab)"
