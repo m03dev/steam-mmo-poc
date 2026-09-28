@@ -1,0 +1,11 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Ziva / local build artifacts
+.godot/
+build/
+export_presets.cfg
+_screen_check.png
+_screen_check.png.import
+addons/ziva_agent/

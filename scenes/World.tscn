@@ -1,0 +1,90 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/level.gd" id="1_level"]
+
+[sub_resource type="Environment" id="Env_1"]
+background_mode = 1
+background_color = Color(0.42, 0.55, 0.72, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.7, 0.7, 0.7, 1)
+ambient_light_energy = 0.7
+
+[sub_resource type="BoxMesh" id="Mesh_ground"]
+size = Vector3(40, 1, 40)
+
+[sub_resource type="BoxShape3D" id="Shape_ground"]
+size = Vector3(40, 1, 40)
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(2, 2, 2)
+
+[sub_resource type="BoxShape3D" id="Shape_box"]
+size = Vector3(2, 2, 2)
+
+[sub_resource type="BoxMesh" id="Mesh_trigger"]
+size = Vector3(3, 3, 3)
+
+[sub_resource type="BoxShape3D" id="Shape_trigger"]
+size = Vector3(3, 3, 3)
+
+[node name="World" type="Node3D"]
+script = ExtResource("1_level")
+level_type = "world"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_1")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8, -0.4, 0.45, 0, 0.7, 0.7, -0.6, -0.6, 0.55, 0, 14, 0)
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("Mesh_ground")
+
+[node name="GroundShape" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("Shape_ground")
+
+[node name="Obstacle1" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 4)
+
+[node name="Mesh" type="MeshInstance3D" parent="Obstacle1"]
+mesh = SubResource("Mesh_box")
+
+[node name="Shape" type="CollisionShape3D" parent="Obstacle1"]
+shape = SubResource("Shape_box")
+
+[node name="Obstacle2" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1, -3)
+
+[node name="Mesh" type="MeshInstance3D" parent="Obstacle2"]
+mesh = SubResource("Mesh_box")
+
+[node name="Shape" type="CollisionShape3D" parent="Obstacle2"]
+shape = SubResource("Shape_box")
+
+[node name="Obstacle3" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1, -9)
+
+[node name="Mesh" type="MeshInstance3D" parent="Obstacle3"]
+mesh = SubResource("Mesh_box")
+
+[node name="Shape" type="CollisionShape3D" parent="Obstacle3"]
+shape = SubResource("Shape_box")
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="Spawner" type="MultiplayerSpawner" parent="."]
+spawn_path = NodePath("../Players")
+
+[node name="Trigger" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -14)
+
+[node name="Mesh" type="MeshInstance3D" parent="Trigger"]
+mesh = SubResource("Mesh_trigger")
+
+[node name="Shape" type="CollisionShape3D" parent="Trigger"]
+shape = SubResource("Shape_trigger")
