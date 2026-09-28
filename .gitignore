@@ -9,3 +9,9 @@ export_presets.cfg
 _screen_check.png
 _screen_check.png.import
 addons/ziva_agent/
+
+# Local test screenshots and packaged builds
+_shot.png
+_shot.png.import
+SteamMMO_windows.zip
+*.zip
