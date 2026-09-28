@@ -159,21 +159,33 @@ func _refresh_steam() -> void:
 		var steam_id: int = steam_peer.get_steam_id_for_peer_id(peer_id)
 		if steam_id == 0:
 			continue
-		# Session info hands back the socket handle for that SteamID; the
-		# real-time status is what carries ping/quality/throughput.
+		# getSessionConnectionInfo is the only reach into the socket we have:
+		# SteamMultiplayerPeer owns the SDR connection internally and never
+		# exposes its HSteamNetConnection, so getConnectionRealTimeStatus() --
+		# which needs that handle -- cannot be called from here at all. Nor does
+		# it need to be: asked for connection info, this call returns the
+		# real-time status fields MERGED into the same dictionary, so ping,
+		# quality and throughput are read straight out of it.
+		#
+		# The original code looked for a "connection" key that this GodotSteam
+		# build does not send, read 0, and so never populated steam_detail at all.
 		var session: Dictionary = Steam.getSessionConnectionInfo(steam_id, true, true)
-		var handle: int = int(session.get("connection", 0))
-		if handle == 0:
-			_note_once(peer_id, "no Steam socket handle yet")
+		# Record the raw dictionary once per peer even when there is no session
+		# yet, so the log shows what this build really sends either way.
+		_log_raw_once(peer_id, session)
+		# k_ESteamNetworkingConnectionState_None == 0, so a zero state means there
+		# is no socket yet and every field below would read as zero anyway.
+		if session.is_empty() or int(session.get("connection_state", 0)) == 0:
+			steam_detail.erase(peer_id)
+			_note_once(peer_id, "no Steam session yet (connection_state 0)")
 			continue
-		var raw: Dictionary = Steam.getConnectionRealTimeStatus(handle, 0, true)
 		steam_detail[peer_id] = {
-			"ping": int(raw.get("ping", -1)),
-			"quality": float(raw.get("local_quality", -1.0)),
-			"in_kbps": float(raw.get("bytes_in_per_second", 0.0)) / 1024.0,
-			"out_kbps": float(raw.get("bytes_out_per_second", 0.0)) / 1024.0,
+			"ping": int(session.get("ping", -1)),
+			"quality": float(session.get("local_quality", -1.0)),
+			"in_kbps": float(session.get("bytes_in_per_second", 0.0)) / 1024.0,
+			"out_kbps": float(session.get("bytes_out_per_second", 0.0)) / 1024.0,
+			"state": int(session.get("connection_state", 0)),
 		}
-		_log_raw_once(peer_id, raw)
 
 
 ## Print each peer's RAW Steam status exactly once. If a field above ever reads

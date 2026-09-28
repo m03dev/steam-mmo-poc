@@ -19,6 +19,18 @@ inventory, no art of our own.
   configure: `steam_appid.txt` in this repo root contains `480`.
 
 ## Open it
+
+On a clean checkout, **import once before anything else**:
+
+    Godot --headless --path . --import
+
+Without that first import the GodotSteam GDExtension is not registered (no
+`.godot/extension_list.cfg` yet) and every autoload dies with
+`Identifier "Steam" not declared`. This bites hardest on a `git archive`
+snapshot, which ships no import cache - found the hard way by the Windows box.
+
+Then:
+
     Godot --path .            # or open the project folder in the editor
 
 ## Run it
