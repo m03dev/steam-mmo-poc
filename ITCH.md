@@ -74,6 +74,9 @@ So, the shortest possible version:
 
 That is the whole account half. He does **not** need to know anything about uploading.
 
+**The push itself is ready to go: `tools/itch_push.sh <user> <slug>`** (dry-run works
+without any credentials, and it verifies the build against `VERSIONS.md` before sending).
+
 ### Then, to let me upload builds (one of two options)
 
 **`butler` is already installed** — `~/Applications/butler/butler`, v15.31.0. Not on `PATH`;
@@ -97,15 +100,29 @@ should be revoked afterwards.
 
 ## What I do once the page exists
 
+**It is one command, and it refuses to ship anything it cannot vouch for:**
+
 ```bash
-# all three artefacts come from ONE `tools/release.sh` run
-~/Applications/butler/butler push dist/SteamMMO_<version>.zip       <user>/<slug>:windows --userversion <version>
-~/Applications/butler/butler push dist/SteamMMO_<version>_macos.zip <user>/<slug>:osx     --userversion <version>
-~/Applications/butler/butler push build/web                         <user>/<slug>:html5   --userversion <version>
+tools/itch_push.sh <itch-user> <page-slug>            # windows + osx
+tools/itch_push.sh <itch-user> <page-slug> --dry-run  # print the pushes, send nothing
+tools/itch_push.sh <itch-user> <page-slug> --html5    # only if the web build passes
 ```
 
-(Note the artefact is `_macos.zip`, not `_mac.zip`, and the HTML5 channel wants the
-**folder**, not a zip.)
+What that script does, in the order that matters:
+
+- Verifies **both zips against the sha256 in `VERSIONS.md`** before pushing, so a build
+  edited by hand after release cannot quietly go up.
+- Pushes `windows` and `osx` **only**. `html5` is deliberately not pushed: its menu is dead
+  in a browser (see the browser section below), and a broken page is worse than no page.
+  `--html5` exists, but it runs `tools/web_smoke.sh` first and **aborts** if the browser
+  build fails — the flag cannot be used to ship the known-bad build by accident.
+- Refuses to run at all without `~/.config/itch/butler_creds`, and prints the one command
+  Mohamed has to run himself.
+- Reminds you of the page text that stops testers reporting a good build as broken (the
+  unsigned-macOS/Gatekeeper note), and that the same push is the update mechanism.
+
+(the artefact is `_macos.zip`, not `_mac.zip`, and an HTML5 channel wants the **folder**,
+not a zip.)
 
 **The macOS download WILL be quarantined by Gatekeeper.** The app is unsigned, so a copy that
 arrives over the internet gets flagged: testers see *"cannot be opened because the developer
@@ -223,7 +240,8 @@ line. itch shows the first four on the page, so the first one should be the wide
       161/161 unit tests pass; protocol unchanged at 3. Two limits stand: the **browser build
       stays single-player** (no UDP in a browser) and direct-IP play is **world-only** (a
       dungeon needs a Steam session). — *owner: Castor, done*
-- [ ] **1b. Browser build** — it exports, serves, and *renders* its menu in a real browser,
+- [ ] **1b. Browser build — DECISION PARKED (Mohamed, 2026-09-28): push the downloads
+      first, settle the browser later.** It exports, serves, and *renders* its menu in a real browser,
       but the menu is **inert**: three Steam-coupled autoloads fail to parse in web (see the
       section above for the console evidence). **NOT shippable as it stands.** Needs a
       decision (options A/B/C above, owner: Mohamed) and then the work (owner: Castor), and
@@ -233,7 +251,11 @@ line. itch shows the first four on the page, so the first one should be the wide
 - [ ] **3. Get `butler` working.** Installed: `~/Applications/butler/butler` v15.31.0 (see the
       correction about `broth.itch.zone` above). What is still missing is **auth** — either
       Mohamed runs `butler login` once, or he hands over an API key.
-- [ ] **4. Castor: push the first build** and take the screenshots.
+- [x] **4a. The push is one command away** — `tools/itch_push.sh <user> <slug>` (verified:
+      ledger sha checks pass, `--dry-run` clean, and it refuses both without a login and
+      with `--html5` while the browser build is broken). It still needs step 2 + 3.
+- [ ] **4b. Castor: take the page screenshots** (the push waits on the same two human
+      things, so this can happen after).
 - [ ] **5. Verify the download runs on a machine that has never seen this project** — the
       only honest test of a distributable. Windows build on Pollux's box is the obvious
       candidate; he is already on the other side of the channel.

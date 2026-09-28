@@ -121,18 +121,28 @@ Also `tests/two_peer_harness.tscn` (replication + level swap) and `tests/chat_ha
 
 ## Publishing
 
-- **Steam:** `STEAM_RELEASE.md` covers the Steamworks side, the playtest shape, and how an App ID
-  gets wired in. Build with `tools/release.sh`, upload with `tools/steampipe.sh`.
-- **Browser:** a **Web** preset exists (`export_presets.cfg [preset.2]`, threads off, so it needs
-  no special server headers) and produces a click-to-play build for itch's HTML5 channel.
-  Single-player only — the Steam API does not exist in a browser. `ITCH.md` has the command and
-  exactly how far its verification got.
-- **itch.io:** playable offline today, but **its multiplayer is Steam-based**, so an itch build
-  would be single-player only until either (a) the game has its own Steam App ID, or (b) a
-  non-Steam transport exists. The seam for (b) is real and already proven: `NetworkManager` is the
-  only file that knows the transport, and the harnesses above drive the whole game over plain ENet.
-  Uploading needs the owner's itch account plus an API key for `butler`:
-  `butler push dist/SteamMMO_<version>.zip <user>/<game>:windows`.
+`tools/release.sh "what changed"` cuts one numbered release: a Windows zip, a macOS zip and
+the web folder, all from the same tree, recorded in `VERSIONS.md`, with both zips copied into
+Google Drive and verified by sha256.
+
+- **itch.io (downloads):** `tools/itch_push.sh <itch-user> <page-slug>` pushes the Windows and
+  macOS builds. It verifies each artefact against the `VERSIONS.md` ledger before sending, and
+  it will not push the browser build at all while that build's menu is dead (below). The
+  macOS build is unsigned, so the page must tell people about Gatekeeper or they will report
+  a good build as broken.
+- **Multiplayer in those downloads:** Steam *or* direct IP. A build with no Steam can still
+  host and join — one player presses *Host Direct*, the other types their address (LAN works
+  as-is; across the internet the host forwards port 23460). No protocol difference: the two
+  transports interoperate.
+- **The browser build: produced, and knowingly NOT shippable yet.** It exports and renders its
+  start screen in a real browser, but every button is inert: a browser has no GodotSteam, so
+  the `Steam` global and `SteamMultiplayerPeer` type do not exist, and the three autoloads that
+  name them fail to **parse** — before any of their runtime guards can run. `tools/web_smoke.sh`
+  drives a real browser and reports the game's own console, so this is one command to check
+  rather than a screenshot to squint at. Even once fixed it is single-player only: a browser
+  cannot open a UDP socket. `ITCH.md` weighs the three ways to fix it.
+- **Steam:** `STEAM_RELEASE.md` covers the Steamworks side — the App ID, the playtest shape —
+  and `tools/steampipe.sh` uploads a build.
 
 ## Layout
 
