@@ -13,6 +13,10 @@ const GAME_SCENE: String = "res://scenes/Main.tscn"
 @onready var _lobby_id_input: LineEdit = %LobbyIdInput
 @onready var _join_button: Button = %JoinButton
 
+## Set from the command line, then consumed once Steam is ready. See
+## _read_launch_action().
+var _launch_action: String = ""
+
 
 func _ready() -> void:
 	%HostWorldButton.pressed.connect(_host.bind(NetworkManager.TYPE_WORLD))
@@ -29,10 +33,37 @@ func _ready() -> void:
 	NetworkManager.lobby_join_failed.connect(_on_session_failed)
 	SteamManager.steam_initialized.connect(_on_steam_initialized)
 
+	_launch_action = _read_launch_action()
 	_refresh_identity()
 	# SteamManager is an autoload, so it may already have resolved before this
 	# scene ran; apply the current state rather than waiting for a signal.
 	_on_steam_initialized(SteamManager.is_initialized)
+
+
+## Dev convenience: skip the menu from the command line, so a host can be left
+## running unattended for other peers to auto-join.
+##   Godot --path <project> res://ui/start_screen.tscn -- --host-world
+## --host-dungeon and --offline are accepted too.
+func _read_launch_action() -> String:
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	for action: String in ["--host-world", "--host-dungeon", "--offline"]:
+		if args.has(action):
+			return action
+	return ""
+
+
+## Runs once, as soon as we know whether Steam is up. Offline play still works
+## without Steam, so it is handled in both branches of _on_steam_initialized.
+func _run_launch_action() -> void:
+	var action: String = _launch_action
+	_launch_action = ""
+	match action:
+		"--host-world":
+			_host(NetworkManager.TYPE_WORLD)
+		"--host-dungeon":
+			_host(NetworkManager.TYPE_DUNGEON)
+		"--offline":
+			_enter_game()
 
 
 func _host(lobby_type: String) -> void:
@@ -77,8 +108,12 @@ func _on_steam_initialized(success: bool) -> void:
 	_lobby_id_input.editable = success
 	if success:
 		_set_status("Steam ready. Host a world, or join one with a Lobby ID.")
+		_run_launch_action()
 	else:
 		_set_status("Steam is offline - multiplayer disabled. Use Play Offline.")
+		# Offline play needs nothing from Steam, so it can still start.
+		if _launch_action == "--offline":
+			_run_launch_action()
 
 
 func _refresh_identity() -> void:
