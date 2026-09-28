@@ -51,6 +51,12 @@ var is_host: bool = false
 var _pending_create_type: String = ""
 var _pending_autojoin_type: String = ""
 
+## How many times to re-check the lobby list before giving up and hosting. Stops
+## two peers launched at the same instant from each seeing an empty list and
+## hosting two separate lobbies they can never meet in.
+const AUTOJOIN_RETRIES: int = 2
+var _autojoin_attempt: int = 0
+
 
 func _ready() -> void:
 	# Steam-side signals: lobby results.
@@ -108,6 +114,7 @@ func auto_join_first_open(lobby_type: String) -> void:
 	if not _require_steam("auto_join_first_open"):
 		return
 	_pending_autojoin_type = lobby_type
+	_autojoin_attempt = 0
 	print("[NetworkManager] Auto-join: looking for an open '%s' lobby..." % lobby_type)
 	Steam.requestLobbyList()  # async -> _on_steam_lobby_match_list
 
@@ -259,9 +266,21 @@ func _on_steam_lobby_match_list(lobbies: Array) -> void:
 	if found != 0:
 		print("[NetworkManager] Found open '%s' lobby %d -> joining." % [wanted, found])
 		join_lobby(found)
-	else:
-		print("[NetworkManager] No open '%s' lobby -> hosting a new one." % wanted)
-		create_lobby(wanted)
+		return
+	if _autojoin_attempt < AUTOJOIN_RETRIES:
+		_autojoin_attempt += 1
+		# Both peers launched at once both saw an empty list. Rather than host
+		# immediately (and never meet), wait a randomised moment and ask again;
+		# only host if there is STILL nothing to join.
+		var delay: float = randf_range(0.5, 1.2) * float(_autojoin_attempt)
+		print("[NetworkManager] No open '%s' lobby; re-checking in %.1fs (attempt %d/%d)..." % [
+				wanted, delay, _autojoin_attempt, AUTOJOIN_RETRIES])
+		await get_tree().create_timer(delay).timeout
+		_pending_autojoin_type = wanted
+		Steam.requestLobbyList()
+		return
+	print("[NetworkManager] No open '%s' lobby -> hosting a new one." % wanted)
+	create_lobby(wanted)
 
 #endregion
 

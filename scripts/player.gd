@@ -33,5 +33,10 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	move_and_slide()
+	# Safety net: if we walk off the edge, drop back into the level instead of
+	# falling forever (which would look like the box simply vanished).
+	if global_position.y < -20.0:
+		global_position = Vector3(0.0, 3.0, 0.0)
+		velocity = Vector3.ZERO
 	if input != Vector2.ZERO:
 		rotation.y = atan2(input.x, input.y)

@@ -7,6 +7,9 @@ extends Node3D
 ## (the network half lives in NetworkManager; the level swap lives in main.gd).
 
 @export var level_type: String = "world"
+## Where players appear in this level. Spread out per peer so two boxes never
+## spawn inside each other (which makes physics fling them apart).
+@export var spawn_point: Vector3 = Vector3(0.0, 1.0, 0.0)
 
 const PLAYER_SCENE: PackedScene = preload("res://scenes/Player.tscn")
 
@@ -37,7 +40,11 @@ func _ready() -> void:
 
 func _spawn_player(data: Variant) -> Node:
 	var player: Node3D = PLAYER_SCENE.instantiate()
-	player.name = "player_%d" % int(data)
+	var id: int = int(data)
+	player.name = "player_%d" % id
+	# Deterministic per-peer offset: every peer computes the same spot, so the
+	# spawn position agrees across the network without extra traffic.
+	player.position = spawn_point + Vector3(float(id % 4) * 2.0 - 3.0, 0.0, 0.0)
 	return player
 
 
@@ -58,6 +65,7 @@ func _despawn(id: int) -> void:
 func _spawn_local() -> void:
 	var player: Node3D = PLAYER_SCENE.instantiate()
 	player.name = "player_1"
+	player.position = spawn_point
 	players.add_child(player)
 
 
