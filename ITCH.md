@@ -121,10 +121,68 @@ the Mac build as broken and be right to.
   that motivated this whole thread.
 - Tag the build before pushing (`butler push --userversion 0.0009`), so the version shown on
   the page matches `VERSION`. Version strings in one place only.
-## The browser build: built, and one step short of proven
+## The browser build: it renders, but it does NOT work yet — and now we know exactly why
 
-The best artefact itch can host is a **click-and-play browser build** — no download, no
-install, no Steam account. That is now produced:
+The best artefact itch can host would be a **click-and-play browser build** — no download, no
+install, no Steam account. It is produced, and it looks perfect. It is not shippable.
+
+**What was true before, and was too generous:** an earlier note here said the build "boots"
+past the loading splash, and that the only thing left was a human glance. Both halves were
+wrong, and the reason is worth writing down:
+
+- **Headless Chrome was the wrong instrument.** It stops at the loading splash and reports
+  nothing, which I mistook for a rendering limit. A **real** browser goes all the way to the
+  start screen — every button drawn, `Steam: not connected` shown.
+- **A web export can boot, draw its menu, and be completely inert.** The game's own errors go
+  to the *browser's* console, where nothing on the developer's machine sees them. Captured, it
+  is unambiguous:
+
+      ERROR: Failed to instantiate an autoload, script 'res://autoload/SteamManager.gd'
+             does not inherit from 'Node'.
+      (the same for NetworkManager.gd and NetStats.gd)
+      SCRIPT ERROR: Parse Error: Identifier "Steam" not declared in the current scope.
+      SCRIPT ERROR: Parse Error: Could not find type "SteamMultiplayerPeer".
+
+**Root cause.** A browser has no GodotSteam (there is no wasm32 binary) and therefore no
+`Steam` global and no `SteamMultiplayerPeer` *type*. These are **parse-time** failures, not
+runtime ones: the whole script is rejected before a line of it runs, so no
+`Engine.has_singleton("Steam")` guard can help. The three autoloads that name Steam never
+instantiate, and the menu — which talks to `NetworkManager` for every button — is dead. Only
+the picture is alive. (~52 references in `NetworkManager.gd`, 7 in `NetStats.gd`,
+6 in `SteamManager.gd`.)
+
+**Check it with one command, do not trust a screenshot:**
+
+```bash
+tools/web_smoke.sh              # serves build/web, drives a real Chrome in its own
+                                # profile, prints the game's console, verdicts FAIL/PASS
+```
+
+It captures only the browser window's rectangle (never the whole screen) and exits non-zero
+on this exact failure. This is how the finding above was produced, and how any fix must be
+confirmed.
+
+### What it would take to fix (a real decision, for Mohamed)
+
+| Option | Cost | Result |
+| --- | --- | --- |
+| **A. Web-only shims** | Small, contained: three small scripts implementing the *same public surface* (`NetworkManager.TYPE_WORLD`, `is_direct_session()`, the signals, …) and switching to them **only inside the web export**, so no desktop code changes at all. | A working single-player browser demo. Two implementations of one API to keep in step. |
+| **B. Take Steam out of the parse path** | Larger, careful: move every Steam call and Steam type behind a lazily-loaded backend in the three autoloads, so they parse anywhere. | One implementation, cleaner long-term — and it touches the verified Steam path, which then needs re-testing. |
+| **C. Drop the `html5` channel** | Zero. | itch = Windows + macOS downloads. Browser demo never happens. |
+
+**Worth knowing before choosing:** even fixed, the browser build is **single-player only** —
+a browser cannot open a UDP socket, so no transport can ever work there. Option A buys a
+demo people can try in a tab; it does not buy multiplayer.
+
+Push it once it passes and the slug exists:
+
+```bash
+~/Applications/butler/butler push build/web <user>/<slug>:html5 --userversion <version>
+```
+
+itch wants the **folder** for an HTML5 game, not a zip, and it must contain `index.html`.
+
+The export recipe (unchanged, and it works — the output is complete):
 
 ```bash
 cd /Users/mohamed/testing-17
@@ -136,32 +194,6 @@ mkdir -p build/web                       # Godot will NOT create this for you
 Result: `index.html` / `.js` / `.wasm` / `.pck`, ~45 MB, threads **off** so it needs no
 special headers from itch. Templates are installed and `export_presets.cfg [preset.2]` holds
 the config; see `AGENTS.md` section 9 for the details and the traps.
-
-**Verified:** the export completes; the files are complete and serve over HTTP; and in a real
-browser the build **boots** — a capture of the running page shows Godot's loading splash
-drawn from the exported wasm.
-
-**Not verified, and said out loud:** that the game gets *past* boot to the start screen. Under
-headless Chrome it stops at the splash reproducibly, whichever renderer is forced — a
-software-rendering limit, not a verdict on the build. So the first real test is a human
-opening it once, which takes ten seconds:
-
-```bash
-# serve it, then open the URL in any real browser
-cd /Users/mohamed/testing-17/build/web && python3 -m http.server 8123
-open http://localhost:8123/
-```
-
-Expect: the start screen, then **Play Offline** (there is no Steam in a browser — the code
-handles that by design, `autoload/SteamManager.gd` checks for the Steam singleton first).
-
-Push it to the page once the slug exists:
-
-```bash
-~/Applications/butler/butler push build/web <user>/<slug>:html5 --userversion <version>
-```
-
-itch wants the **folder** for an HTML5 game, not a zip, and it must contain `index.html`.
 
 ## Page copy (draft, for review — a first sketch, not final)
 
@@ -191,9 +223,11 @@ line. itch shows the first four on the page, so the first one should be the wide
       161/161 unit tests pass; protocol unchanged at 3. Two limits stand: the **browser build
       stays single-player** (no UDP in a browser) and direct-IP play is **world-only** (a
       dungeon needs a Steam session). — *owner: Castor, done*
-- [x] **1b. Browser build** — exported, files complete, boots in a browser. **One human
-      check left**: open it once in a real browser and confirm it reaches the start screen
-      and plays offline (see the section above). — *owner: Mohamed, 10 seconds*
+- [ ] **1b. Browser build** — it exports, serves, and *renders* its menu in a real browser,
+      but the menu is **inert**: three Steam-coupled autoloads fail to parse in web (see the
+      section above for the console evidence). **NOT shippable as it stands.** Needs a
+      decision (options A/B/C above, owner: Mohamed) and then the work (owner: Castor), and
+      in either case a `tools/web_smoke.sh` pass before it goes on the page.
 - [x] **2. The account exists** — Mohamed has one. Still needed from him: the **username**
       and the **page slug**, so a push has a target. (Page: <https://itch.io/game/new>.)
 - [ ] **3. Get `butler` working.** Installed: `~/Applications/butler/butler` v15.31.0 (see the

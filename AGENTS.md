@@ -196,7 +196,7 @@ Read these before debugging something that is not broken:
   `[dotnet] project/assembly_name="testing_17"`, left there by the mono editor that created
   the project. The **standard non-.NET Godot 4.7 editor opens the project with that marker
   present, with no error**: GodotSteam loads, Steam initializes, and the GUT suite runs
-  **149/149**. Do not "clean up" the marker hoping to fix something, and do not assume a
+  **161/161**. Do not "clean up" the marker hoping to fix something, and do not assume a
   non-.NET editor needs a project change to open this game. Both editors work.
 - `steam_appid.txt` is the App ID source of truth; `tools/release.sh` copies it into the
   build and shouts in red while it is still 480.
@@ -242,7 +242,7 @@ so. That is how a POC stays honest.
 ## 9. Editor choice, and the web build it unlocks
 
 **Both Godot editors run this project** — verified above: standard (non-.NET) 4.7-stable
-opens it, initialises Steam and passes **149/149**, exactly like the mono editor. The game
+opens it, initialises Steam and passes **161/161**, exactly like the mono editor. The game
 is GDScript-only, so .NET buys it nothing.
 
 - macOS, mono (what the Ziva-managed editor uses): `/Applications/Godot_mono.app/...`
@@ -270,23 +270,45 @@ account — the fastest possible way for a friend to actually see the game.
                create the output folder - it fails with "Target folder does not exist", so
                mkdir first. Output: index.html/.js/.wasm/.pck, ~45 MB total.
 
-**What is verified, and what is not.** The export completes cleanly, the files are complete
-and serve over HTTP, and in a real browser the build **boots**: `--screenshot` captured
-Godot's own loading splash rendered from the exported wasm. What is **not** verified is the
-game itself reaching the start screen — under headless Chrome the boot stops at that splash
-**reproducibly** (identical frame, 36303 bytes, with or without `--use-angle=metal`, with and
-without swiftshader), which is a limit of software rendering, not evidence about the build.
-**Do not burn an hour on headless Chrome**; open the thing in a real browser instead (see
-`ITCH.md` for the local-serve one-liner). Everything about the browser is otherwise pleasant:
-the code already survives a missing Steam — `autoload/SteamManager.gd` checks
-`Engine.has_singleton("Steam")` first, reports `steam_initialized(false)` and returns, and
-`_process` only pumps callbacks when initialised — which is exactly what a browser is, and
-why the start screen's *Play Offline* is the path that matters there.
+**What is verified, and what is not — read this before believing a web build works.**
+The export completes cleanly, the files are complete and serve over HTTP, and in a real
+browser the build reaches the **start screen**, drawn completely. That is where the good
+news ends: **the menu is inert.** The game's own errors go to the *browser's* console, where
+nothing local sees them, and what they say is:
 
-Two honest limits, so nobody promises more than this can do:
+    ERROR: Failed to instantiate an autoload, script 'res://autoload/SteamManager.gd'
+           does not inherit from 'Node'.      (same for NetworkManager.gd and NetStats.gd)
+    SCRIPT ERROR: Parse Error: Identifier "Steam" not declared in the current scope.
+    SCRIPT ERROR: Parse Error: Could not find type "SteamMultiplayerPeer".
 
-1. **A web build cannot do multiplayer.** The Steam API does not exist in a browser. Web =
-   single-player preview (world, wolves, quest, inventory). Multiplayer stays on the
-   downloadable Steam build, and on the direct-IP ENet transport once that exists.
-2. **The .tpz is one monolithic download** for every platform — there is no web-only
-   package. It is already installed once, so this is a note, not a task.
+A browser has no GodotSteam, so there is no `Steam` global and no `SteamMultiplayerPeer`
+*t*ype — and these are **parse-time** failures, so the whole script is rejected before a line
+of it runs. The runtime guard (`Engine.has_singleton("Steam")`) is therefore useless here: it
+sits inside a file that never gets to execute. Those three autoloads never instantiate and
+every button that talks to `NetworkManager` does nothing.
+
+Two traps that caused an earlier WRONG conclusion, both now covered by a tool:
+
+- **Headless Chrome is not an instrument for this.** It stops at the loading splash and
+  reports nothing, reproducibly, whatever renderer is forced (`--use-angle=metal`,
+  `--enable-unsafe-swiftshader`) — that is a limit of software rendering, not a verdict.
+- **A screenshot is not an instrument either.** It shows a beautiful, dead menu. Only the
+  browser's own console tells the truth.
+
+Use the tool instead, and do not trust a picture:
+
+    tools/web_smoke.sh          # real Chrome in its own profile, prints the game's console,
+                                # verdicts FAIL/PASS, non-zero exit on this exact failure
+                                # --port N / --wait S / --keep-open
+
+It captures **only the browser window's rectangle**, never the whole screen: a full-screen
+grab on someone's working machine catches whatever else is open on it. (`screencapture` needs
+Screen Recording permission for the terminal; a blank or desktop-only picture is that
+permission, not a build verdict.) Deliberately do **not** use `open -a "Google Chrome"` for
+this: on an already-running Chrome it just focuses the existing window and ignores every flag,
+which is how an early attempt "tested" the wrong window entirely.
+
+The browser build is therefore **produced but not shippable** until a fix lands; the options
+(A: web-only shims, B: take Steam out of the parse path, C: drop the html5 channel) are
+weighed in `ITCH.md`. Fixing it still only buys a **single-player** browser demo — a browser
+cannot open a UDP socket, so no transport can ever work there.

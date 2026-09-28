@@ -104,7 +104,7 @@ containing `assert_true(false)` was reported as passing).
 Godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests/unit -gexit -glog=1
 ```
 
-Currently **13 scripts, 149 tests, 329 asserts, ~7s.**
+Currently **14 scripts, 161 tests, 359 asserts, ~7s.**
 
 ## Verification harnesses (not shipped content)
 
