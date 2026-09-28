@@ -1,0 +1,33 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/inventory_panel.gd" id="1_inv"]
+[ext_resource type="Theme" path="res://ui/ui_theme.tres" id="2_theme"]
+
+[node name="InventoryPanel" type="CanvasLayer"]
+layer = 14
+script = ExtResource("1_inv")
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -132.0
+offset_right = 264.0
+offset_bottom = -16.0
+theme = ExtResource("2_theme")
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Panel/VBox"]
+theme_override_colors/font_color = Color(0.921569, 0.964706, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "Inventory"
+
+[node name="Empty" type="Label" parent="Panel/VBox"]
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 12
+text = "Nothing yet - pelts show up here."
+
+[node name="Rows" type="VBoxContainer" parent="Panel/VBox"]
+theme_override_constants/separation = 2

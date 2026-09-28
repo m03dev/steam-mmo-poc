@@ -120,7 +120,7 @@ surface_material_override/0 = SubResource("Mat_giver")
 [node name="Pickups" type="Node3D" parent="."]
 
 [node name="Pickup1" type="Node3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.4, 6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.6, 0.4, -5.6)
 script = ExtResource("3_pickup")
 item_id = "wolf_pelt"
 
@@ -129,7 +129,7 @@ mesh = SubResource("Mesh_pickup")
 surface_material_override/0 = SubResource("Mat_pickup")
 
 [node name="Pickup2" type="Node3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0.4, 7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6, 0.4, -5.6)
 script = ExtResource("3_pickup")
 item_id = "wolf_pelt"
 
@@ -138,7 +138,7 @@ mesh = SubResource("Mesh_pickup")
 surface_material_override/0 = SubResource("Mat_pickup")
 
 [node name="Pickup3" type="Node3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.4, -10)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, -8.6)
 script = ExtResource("3_pickup")
 item_id = "wolf_pelt"
 
