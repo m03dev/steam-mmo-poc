@@ -14,6 +14,8 @@ extends Node3D
 const PLAYER_SCENE: PackedScene = preload("res://scenes/Player.tscn")
 
 var _transitioning: bool = false
+## Client-only overview camera shown until the host spawns our own box.
+var _fallback_cam: Camera3D = null
 
 @onready var spawner: MultiplayerSpawner = $Spawner
 @onready var players: Node3D = $Players
@@ -23,28 +25,42 @@ var _transitioning: bool = false
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	trigger.body_entered.connect(_on_trigger_entered)
+	# NOTE: Godot's default multiplayer_peer is an OfflineMultiplayerPeer, NOT
+	# null. Testing `== null` alone would make every peer think it is the server,
+	# so "are we actually connected to anyone?" must name that class explicitly.
+	var offline: bool = multiplayer.multiplayer_peer == null \
+			or multiplayer.multiplayer_peer is OfflineMultiplayerPeer
+	print("[Level/%s] ready | offline=%s server=%s my_id=%d" % [
+			level_type, str(offline), str(multiplayer.is_server()), multiplayer.get_unique_id()])
 
-	# Offline / editor: no peer, so just spawn a local player to walk around.
-	if multiplayer.multiplayer_peer == null:
+	# Offline / editor: no real connection, so just spawn a local player.
+	if offline:
 		_spawn_local()
 		return
 
-	# Only the server spawns; clients receive the spawns.
 	if multiplayer.is_server():
+		# Host: it is the only peer that spawns; clients receive the spawns.
 		multiplayer.peer_connected.connect(_spawn)
 		multiplayer.peer_disconnected.connect(_despawn)
 		_spawn(multiplayer.get_unique_id())
 		for id in multiplayer.get_peers():
 			_spawn(id)
+	else:
+		# Client: the host spawns our box and replicates it. Until that arrives
+		# we would be staring at a black screen, so watch from a fixed overview
+		# camera; our player's camera takes over the moment it spawns.
+		_show_fallback_camera()
 
 
 func _spawn_player(data: Variant) -> Node:
+	print("[Level/%s] spawning player_%s" % [level_type, str(data)])
 	var player: Node3D = PLAYER_SCENE.instantiate()
 	var id: int = int(data)
 	player.name = "player_%d" % id
 	# Deterministic per-peer offset: every peer computes the same spot, so the
 	# spawn position agrees across the network without extra traffic.
 	player.position = spawn_point + Vector3(float(id % 4) * 2.0 - 3.0, 0.0, 0.0)
+	_tint(player, id)
 	return player
 
 
@@ -53,6 +69,7 @@ func _spawn(id: int) -> void:
 		return
 	if players.has_node("player_%d" % id):
 		return
+	print("[Level/%s] server spawn request for %d" % [level_type, id])
 	spawner.spawn(id)
 
 
@@ -66,7 +83,30 @@ func _spawn_local() -> void:
 	var player: Node3D = PLAYER_SCENE.instantiate()
 	player.name = "player_1"
 	player.position = spawn_point
+	_tint(player, 1)
 	players.add_child(player)
+
+
+## Give each peer's box a distinct colour so it is obvious which one is yours
+## and which are the other players' (pure testing clarity, not art).
+func _tint(player: Node3D, id: int) -> void:
+	var body: MeshInstance3D = player.get_node("Body")
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_color = Color.from_hsv(float(abs(id) % 12) / 12.0, 0.55, 0.95)
+	body.material_override = mat
+
+
+## Client-side overview camera, used only until our own box is spawned by the
+## host. Without it a just-joined client renders nothing at all.
+func _show_fallback_camera() -> void:
+	if _fallback_cam != null:
+		return
+	_fallback_cam = Camera3D.new()
+	_fallback_cam.name = "FallbackCamera"
+	_fallback_cam.position = Vector3(0.0, 12.0, 16.0)
+	_fallback_cam.rotation_degrees = Vector3(-32.0, 0.0, 0.0)
+	add_child(_fallback_cam)
+	_fallback_cam.current = true
 
 
 func _on_trigger_entered(body: Node3D) -> void:
@@ -74,7 +114,8 @@ func _on_trigger_entered(body: Node3D) -> void:
 	# volume does not retrigger the transition every physics frame.
 	if _transitioning:
 		return
-	if body is CharacterBody3D and body.is_multiplayer_authority():
+	if body is CharacterBody3D and multiplayer.multiplayer_peer != null \
+			and body.is_multiplayer_authority():
 		_transitioning = true
 		var target: String = NetworkManager.TYPE_DUNGEON if level_type == NetworkManager.TYPE_WORLD else NetworkManager.TYPE_WORLD
 		print("[Level] '%s' trigger hit -> transitioning to '%s'." % [level_type, target])
