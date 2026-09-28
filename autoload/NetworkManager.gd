@@ -37,13 +37,35 @@ const KEY_PROTOCOL: String = "protocol"
 ## It is baked in as a const on purpose: res://VERSION is a loose text file that may
 ## not be packed into an exported build, whereas a const always is. Published in the
 ## lobby and in each member's own data, so both sides can read what they are talking to.
-const GAME_VERSION: String = "0.0003"
+const GAME_VERSION: String = "0.0004"
 
 ## Wire-protocol revision. Bump this when - and only when - the set of @rpc methods
 ## or their signatures changes. Two builds with the same protocol talk to each other
 ## whatever their version strings say, and a real mismatch is reported on join
 ## instead of surfacing later as a phantom bug.
 const PROTOCOL_VERSION: int = 1
+
+## Steam lobby metadata keys that let the HOST choose how the socket is opened and
+## the CLIENT obey it, so only one end is ever configured.
+const KEY_TRANSPORT: String = "transport"
+const KEY_VPORT: String = "vport"
+
+## How the SDR socket gets opened. Both go through SteamNetworkingSockets P2P; they
+## differ in WHO decides the virtual port, and a mismatch there means the client
+## dials a socket the host never opened - with no error on either side.
+enum Transport {
+	## host_with_lobby() / connect_to_lobby(): the lobby-bound helpers, which pick
+	## the port themselves. This is what the project shipped with.
+	LOBBY_HELPERS,
+	## create_host() / create_client(): the documented siblings, with a port both
+	## ends name explicitly.
+	CANONICAL,
+}
+
+## Virtual port used in CANONICAL mode. SteamNetworkingSockets uses it only to
+## demultiplex on the receiving side - it is not an OS port - but both ends must
+## name the SAME number. Overridable with --vport=N.
+const DEFAULT_VIRTUAL_PORT: int = 4800
 
 ## Steam result code: EResult.k_EResultOK == 1. Used to validate the async
 ## lobby create/join "tells". NOTE: the lobby *type* is passed as Steam's own
@@ -59,6 +81,16 @@ var current_lobby_id: int = 0
 var current_lobby_type: String = ""
 var is_host: bool = false
 
+## Transport actually in use. The host picks it and publishes it in the lobby; a
+## joiner reads the host's choice and matches it, so the two can never disagree.
+var transport: Transport = Transport.LOBBY_HELPERS
+var virtual_port: int = DEFAULT_VIRTUAL_PORT
+
+## Peer diagnostics. 0 is off; set it with --steam-debug=N and the extension prints
+## what SteamNetworkingSockets is doing - the only way to see a silently mismatched
+## socket, since a failed P2P dial reports no error at all.
+var steam_debug_level: int = 0
+
 # Book-keeping for the async Steam calls.
 var _pending_create_type: String = ""
 var _pending_autojoin_type: String = ""
@@ -73,6 +105,7 @@ var _autojoin_attempt: int = 0
 func _ready() -> void:
 	# Identity first, so every log carries the build that produced it.
 	print("[NetworkManager] SteamMMO v%s | netcode protocol %d" % [GAME_VERSION, PROTOCOL_VERSION])
+	_parse_transport_args()
 	# MultiplayerAPI signal, not the peer's, so this survives every peer swap.
 	multiplayer.peer_connected.connect(_on_multiplayer_peer_connected)
 
@@ -220,13 +253,23 @@ func _on_steam_lobby_created(connect_result: int, lobby_id: int) -> void:
 	Steam.setLobbyJoinable(lobby_id, true)
 	Steam.setLobbyMemberData(lobby_id, "name", SteamManager.persona_name)
 	_publish_member_build(lobby_id)
+	# The host decides how the socket is opened and the joiners follow, so only one
+	# end is ever configured and the two cannot disagree about the virtual port.
+	Steam.setLobbyData(lobby_id, KEY_TRANSPORT,
+			"canonical" if transport == Transport.CANONICAL else "lobby")
+	Steam.setLobbyData(lobby_id, KEY_VPORT, str(virtual_port))
 
 	# Create the SDR peer and host it on this lobby.
-	peer = SteamMultiplayerPeer.new()
-	peer.set_server_relay(true)  # force Valve relay: no port forwarding, no NAT pain
-	var err: int = peer.host_with_lobby(lobby_id)
+	peer = _make_peer()
+	var err: int = OK
+	if transport == Transport.CANONICAL:
+		err = peer.create_host(virtual_port)
+		print("[NetworkManager] host: create_host(%d)" % virtual_port)
+	else:
+		err = peer.host_with_lobby(lobby_id)
+		print("[NetworkManager] host: host_with_lobby(%d)" % lobby_id)
 	if err != OK:
-		var reason: String = "SteamMultiplayerPeer.host_with_lobby failed (error %d)." % err
+		var reason: String = "SteamMultiplayerPeer host failed (error %d)." % err
 		push_error("[NetworkManager] " + reason)
 		Steam.leaveLobby(lobby_id)
 		current_lobby_id = 0
@@ -263,12 +306,24 @@ func _on_steam_lobby_joined(lobby_id: int, _permissions: int, _locked: bool, res
 	Steam.setLobbyMemberData(lobby_id, "name", SteamManager.persona_name)
 	_publish_member_build(lobby_id)
 	_report_host_build(lobby_id)
+	# Obey the host's transport choice, so a joiner needs no flags of its own.
+	if Steam.getLobbyData(lobby_id, KEY_TRANSPORT) == "canonical":
+		transport = Transport.CANONICAL
+	var published_port: String = Steam.getLobbyData(lobby_id, KEY_VPORT)
+	if published_port != "":
+		virtual_port = int(published_port)
 
-	peer = SteamMultiplayerPeer.new()
-	peer.set_server_relay(true)
-	var err: int = peer.connect_to_lobby(lobby_id)
+	peer = _make_peer()
+	var err: int = OK
+	if transport == Transport.CANONICAL:
+		var host_steam_id: int = Steam.getLobbyOwner(lobby_id)
+		err = peer.create_client(host_steam_id, virtual_port)
+		print("[NetworkManager] client: create_client(%d, %d)" % [host_steam_id, virtual_port])
+	else:
+		err = peer.connect_to_lobby(lobby_id)
+		print("[NetworkManager] client: connect_to_lobby(%d)" % lobby_id)
 	if err != OK:
-		var reason: String = "SteamMultiplayerPeer.connect_to_lobby failed (error %d)." % err
+		var reason: String = "SteamMultiplayerPeer connect failed (error %d)." % err
 		push_error("[NetworkManager] " + reason)
 		Steam.leaveLobby(lobby_id)
 		current_lobby_id = 0
@@ -329,6 +384,45 @@ func _on_multiplayer_peer_connected(peer_id: int) -> void:
 	if build.contains("protocol") and not build.ends_with(str(PROTOCOL_VERSION)):
 		push_error("[NetworkManager] BUILD MISMATCH on peer %d: it reports %s, we speak protocol %d." % [
 				peer_id, build, PROTOCOL_VERSION])
+
+#endregion
+
+
+#region Transport ---------------------------------------------------------------
+
+## Transport flags, read from this process's own command line.
+##
+##   --transport-canonical   use create_host/create_client instead of the lobby helpers
+##   --transport-lobby       force the lobby helpers (the shipped default)
+##   --vport=N               virtual port for canonical mode (both ends must match)
+##   --steam-debug=N         let the extension print SDR diagnostics
+##
+## Only the HOST needs these: a joiner reads the host's choice out of the lobby. That
+## is deliberate - the client half is the half we cannot test on our own machines, so
+## it must not depend on anyone remembering to pass a flag.
+func _parse_transport_args() -> void:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg == "--transport-canonical":
+			transport = Transport.CANONICAL
+		elif arg == "--transport-lobby":
+			transport = Transport.LOBBY_HELPERS
+		elif arg.begins_with("--vport="):
+			virtual_port = int(arg.trim_prefix("--vport="))
+		elif arg.begins_with("--steam-debug="):
+			steam_debug_level = int(arg.trim_prefix("--steam-debug="))
+	if transport == Transport.CANONICAL or steam_debug_level > 0:
+		print("[NetworkManager] transport=%s virtual_port=%d steam_debug=%d" % [
+				"canonical" if transport == Transport.CANONICAL else "lobby-helpers",
+				virtual_port, steam_debug_level])
+
+
+## The single place a peer is configured, so host and client cannot drift apart.
+func _make_peer() -> SteamMultiplayerPeer:
+	var new_peer: SteamMultiplayerPeer = SteamMultiplayerPeer.new()
+	new_peer.set_server_relay(true)  # force Valve relay: no port forwarding, no NAT pain
+	if steam_debug_level > 0:
+		new_peer.set_debug_level(steam_debug_level)
+	return new_peer
 
 #endregion
 

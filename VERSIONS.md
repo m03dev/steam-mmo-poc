@@ -23,3 +23,13 @@ different size, and that is the quickest way to catch it.
 - Fix the Steam connection-status read (wrong dict key meant it never reported) and document the first-import step
 - `SteamMMO_0.0002.zip` -- 44142307 bytes -- sha256 `07b0d9596b27a70e150d7dd37d6995c19c1586beeabc03df5ea0d74a97cb2abf`
 
+## 0.0003 -- 2026-09-28 07:03
+
+- Make build identity visible: the game announces its version and wire protocol at startup, publishes them in the lobby, and checks them on join
+- `SteamMMO_0.0003.zip` -- 44144312 bytes -- sha256 `f28a60583590266a2e0f5aa443329c239d0b2875dd258175e236da75a64cbf01`
+
+## 0.0004 -- 2026-09-28 07:06
+
+- Add a switchable Steam transport (lobby helpers vs create_host/create_client) with an explicit virtual port, host-published so joiners obey; add --steam-debug for SDR diagnostics
+- `SteamMMO_0.0004.zip` -- 44145720 bytes -- sha256 `7bb65b70009e6b6b54f19683cd1fc8c6ddca80d79432804c4a83bd5f5b8295bd`
+
