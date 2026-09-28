@@ -74,10 +74,21 @@ should be revoked afterwards.
 ## What I do once the page exists
 
 ```bash
-# versioned, already produced by tools/release.sh
-butler push dist/SteamMMO_<version>.zip <user>/steam-mmo-poc:windows
-butler push dist/SteamMMO_<version>_mac.zip  <user>/steam-mmo-poc:osx
+# all three artefacts come from ONE `tools/release.sh` run
+~/Applications/butler/butler push dist/SteamMMO_<version>.zip       <user>/<slug>:windows --userversion <version>
+~/Applications/butler/butler push dist/SteamMMO_<version>_macos.zip <user>/<slug>:osx     --userversion <version>
+~/Applications/butler/butler push build/web                         <user>/<slug>:html5   --userversion <version>
 ```
+
+(Note the artefact is `_macos.zip`, not `_mac.zip`, and the HTML5 channel wants the
+**folder**, not a zip.)
+
+**The macOS download WILL be quarantined by Gatekeeper.** The app is unsigned, so a copy that
+arrives over the internet gets flagged: testers see *"cannot be opened because the developer
+cannot be verified"* or even *"it is damaged"*. Neither means the build is broken — it means
+macOS does not know the author. They can right-click -> **Open** (once), or run
+`xattr -dr com.apple.quarantine SteamMMO.app`. **Put this on the page**, or friends will report
+the Mac build as broken and be right to.
 
 - Channel names are permanent; `windows` / `osx` / `linux` keep the page tidy and let
   itch's app install the right one.

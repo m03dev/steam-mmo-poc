@@ -58,3 +58,10 @@ different size, and that is the quickest way to catch it.
 - Pollux's real-game two-peer chat harness (run here: identical transcripts, both peers spawned), Steam launch invites (+connect_lobby is now read, so Join Game from a cold start goes straight in), and a warning when a friends-only session is hosted because Steam's lobby list cannot see friends-only lobbies.
 - `SteamMMO_0.0009.zip` -- 44192532 bytes -- sha256 `5d4eb55c9f84b8ec1b3595b23b77c8760b180c74fff4da21e2597ab870bae826`
 
+## 0.0010 -- 2026-09-28 10:19
+
+- macOS + Web builds: itch.io channels, packaged by the release script
+- `SteamMMO_0.0010.zip` -- 44233864 bytes -- sha256 `f37e0fe23e1a9206d5059abf42809aba9e836c7999bb9229b973bc2a69e8c4a0` (Windows)
+- `SteamMMO_0.0010_macos.zip` -- 66429457 bytes -- sha256 `435c1e147a49890eb416fcecf806246f32e7fd498556ffe5fe4a85cc3944436a` (macOS)
+- `build/web/` --  45M -- Web/HTML5, built from the same tree
+

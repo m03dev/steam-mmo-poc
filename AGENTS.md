@@ -126,6 +126,30 @@ Read these before debugging something that is not broken:
   with `has_char`.
 - **macOS has no `timeout`** — use `sleep N` + `kill`. A killed process **loses buffered
   stdout**, so a clean exit is the only way to read the last lines.
+- **macOS export: the bundle's innards are named after the PROJECT, not the bundle.** A
+  `SteamMMO.app` comes out containing an executable called `testing_17` **and a
+  `testing_17.pck`**. The engine loads `<executable-name>.pck`, so renaming only the
+  executable breaks the app with *"Couldn't load project data ... Is the .pck file
+  missing?"* — **rename both**. The preset's `application/name` is **ignored** in 4.7, and
+  `application/config/name` must not be touched, so renaming post-export is the honest way;
+  `tools/release.sh` now does it, plus copies `steam_appid.txt` into `Contents/MacOS/`.
+- **Zip a `.app` with `ditto -c -k --sequesterRsrc --keepParent`, never plain `zip`** — a
+  bundle needs its metadata and executable bit, and `ditto` is what preserves them.
+- **An unsigned macOS app is quarantined by Gatekeeper when someone downloads it** — the
+  tester sees "cannot be opened because the developer cannot be verified", or "it is
+  damaged". That is not a broken build. Right-click -> Open bypasses it, or
+  `xattr -dr com.apple.quarantine SteamMMO.app`. Say this on the download page, or friends
+  will report the game as broken. (Running the app locally is unaffected: quarantine only
+  applies to downloaded copies.)
+- **Do not run a packaged build with the project directory as the working directory** — the
+  engine then finds `project.godot` in the CWD and behaves as if overridden. Run it from
+  `/tmp` or similar when smoke-testing, and note that the exported binary supports
+  `--headless --quit`, which is the cheapest real test there is: it boots the packaged
+  `.pck`, initialises Steam, prints the build identity, and exits.
+- **The Web export warns `No "wasm32" library found for GDExtension: godotsteam`.** Expected
+  and harmless: there is no web binary of the Steam extension, so it is simply absent from
+  the web build — which is why `SteamManager`'s `Engine.has_singleton("Steam")` guard is the
+  thing that keeps the browser build alive.
 - **The `[dotnet]` marker in `project.godot` is harmless — this was measured, not assumed.**
   The tree contains **zero C# files**, yet `project.godot` still carries
   `[dotnet] project/assembly_name="testing_17"`, left there by the mono editor that created
