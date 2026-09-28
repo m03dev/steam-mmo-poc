@@ -68,4 +68,14 @@ func _process(_d: float) -> void:
 	var parts: PackedStringArray = []
 	for c in players.get_children():
 		parts.append("%s@%s" % [c.name, str((c as Node3D).global_position.round())])
-	print("[p2/%s] level=%s players=%d | %s" % [_role, _type, players.get_child_count(), " , ".join(parts)])
+	# The RPC ping from NetStats is under test here too: over a real two-peer
+	# session the numbers must be small, identical, and actually populated.
+	print("[p2/%s] level=%s players=%d | %s | %s" % [
+			_role, _type, players.get_child_count(), " , ".join(parts), _net_summary()])
+
+
+func _net_summary() -> String:
+	var parts: PackedStringArray = []
+	for row: Dictionary in NetStats.report():
+		parts.append("peer %d %s" % [int(row["peer_id"]), str(int(row["ping"]))])
+	return " , ".join(parts) if not parts.is_empty() else "no peers"

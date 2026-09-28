@@ -17,10 +17,16 @@ const START_SCENE: String = "res://ui/start_screen.tscn"
 @onready var _fps_value: Label = %FpsValue
 @onready var _net_value: Label = %NetValue
 @onready var _lobby_value: Label = %LobbyValue
+@onready var _ping_value: Label = %PingValue
 @onready var _avatar_value: Label = %AvatarValue
+@onready var _peers_header: Label = %PeersHeader
+@onready var _peer_list: VBoxContainer = %PeerList
 
 var _elapsed: float = 0.0
 var _local_player: Node3D = null
+## peer_id -> that peer's row label, so the list is rebuilt only when peers come
+## or go rather than every refresh.
+var _peer_rows: Dictionary = {}
 
 
 func _ready() -> void:
@@ -43,6 +49,8 @@ func _process(delta: float) -> void:
 func _refresh() -> void:
 	_show_frame_timing()
 	_show_network()
+	_show_peers()
+	_show_ping()
 	_show_avatar()
 
 
@@ -56,7 +64,7 @@ func _show_network() -> void:
 	var role: String = "offline"
 	if NetworkManager.current_lobby_id != 0:
 		role = "host" if NetworkManager.is_host else "client"
-	_net_value.text = "%s   peer %d" % [role.to_upper(), multiplayer.get_unique_id()]
+	_net_value.text = "%s   peer %d%s" % [role.to_upper(), multiplayer.get_unique_id(), _steam_suffix()]
 
 	if NetworkManager.current_lobby_id == 0:
 		_lobby_value.text = "no lobby"
@@ -66,6 +74,78 @@ func _show_network() -> void:
 			NetworkManager.current_lobby_id,
 			NetworkManager.get_player_count(),
 			NetworkManager.MAX_MEMBERS]
+
+
+## Our own Steam account, so a screenshot of this panel identifies the peer.
+func _steam_suffix() -> String:
+	return "   %d" % SteamManager.steam_id if SteamManager.is_initialized else ""
+
+
+## Round-trip summary. The per-peer detail lives in the PEERS rows; this line is
+## the one-glance answer to "how bad is my connection".
+func _show_ping() -> void:
+	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
+	if peer == null or peer is OfflineMultiplayerPeer:
+		_ping_value.text = "offline"
+		return
+	var rows: Array[Dictionary] = NetStats.report()
+	if multiplayer.is_server():
+		if rows.is_empty():
+			_ping_value.text = "no clients yet"
+			return
+		var worst: int = -1
+		for row: Dictionary in rows:
+			worst = maxi(worst, int(row["ping"]))
+		_ping_value.text = "%d client(s)   worst %s" % [rows.size(), _format_ms(worst)]
+		return
+	# A client cares about its own trip to the host above all else.
+	_ping_value.text = "to host %s   (%d other)" % [
+			_format_ms(NetStats.ping_to(1)), maxi(rows.size() - 1, 0)]
+
+
+## One row per remote peer. Rows are created and freed only when the set of peers
+## changes, so the panel does not churn every refresh.
+func _show_peers() -> void:
+	var rows: Array[Dictionary] = NetStats.report()
+	_peers_header.visible = not rows.is_empty()
+	_peer_list.visible = not rows.is_empty()
+
+	var live: Array[int] = []
+	for row: Dictionary in rows:
+		var peer_id: int = int(row["peer_id"])
+		live.append(peer_id)
+		var label: Label = _peer_rows.get(peer_id)
+		if label == null:
+			label = Label.new()
+			label.add_theme_font_size_override("font_size", 12)
+			label.add_theme_color_override("font_color", Color(0.749, 0.831, 0.898))
+			_peer_list.add_child(label)
+			_peer_rows[peer_id] = label
+		label.text = _peer_line(row)
+
+	# Keys() is a copy, so erasing while iterating is safe.
+	for peer_id: int in _peer_rows.keys():
+		if not live.has(peer_id):
+			_peer_rows[peer_id].queue_free()
+			_peer_rows.erase(peer_id)
+
+
+## "<peer id> <name> <ping> [steam <ping>] [q <quality>]" -- only the parts we
+## actually have. The peer id leads because that is the id replication uses.
+func _peer_line(row: Dictionary) -> String:
+	var parts: PackedStringArray = PackedStringArray([
+			str(int(row["peer_id"])), str(row["name"]), _format_ms(int(row["ping"]))])
+	var steam_ping: int = int(row["steam_ping"])
+	if steam_ping >= 0:
+		parts.append("steam %d ms" % steam_ping)
+	var quality: float = float(row["quality"])
+	if quality >= 0.0:
+		parts.append("q %.0f%%" % (quality * 100.0))
+	return "  ".join(parts)
+
+
+func _format_ms(ms: int) -> String:
+	return "--" if ms < 0 else "%d ms" % ms
 
 
 ## The avatar line needs the local player, which only exists once the level has

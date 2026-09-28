@@ -57,6 +57,17 @@ theme_override_colors/font_color = Color(0.866667, 0.933333, 1, 1)
 theme_override_font_sizes/font_size = 12
 text = "--"
 
+[node name="PingKey" type="Label" parent="Margin/Panel/VBox/Grid"]
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 11
+text = "PING"
+
+[node name="PingValue" type="Label" parent="Margin/Panel/VBox/Grid"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.866667, 0.933333, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "--"
+
 [node name="AvatarKey" type="Label" parent="Margin/Panel/VBox/Grid"]
 theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
 theme_override_font_sizes/font_size = 11
@@ -67,6 +78,16 @@ unique_name_in_owner = true
 theme_override_colors/font_color = Color(0.866667, 0.933333, 1, 1)
 theme_override_font_sizes/font_size = 12
 text = "--"
+
+[node name="PeersHeader" type="Label" parent="Margin/Panel/VBox"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 11
+text = "PEERS"
+
+[node name="PeerList" type="VBoxContainer" parent="Margin/Panel/VBox"]
+unique_name_in_owner = true
+theme_override_constants/separation = 1
 
 [node name="MenuButton" type="Button" parent="Margin/Panel/VBox"]
 unique_name_in_owner = true
