@@ -33,3 +33,8 @@ different size, and that is the quickest way to catch it.
 - Add a switchable Steam transport (lobby helpers vs create_host/create_client) with an explicit virtual port, host-published so joiners obey; add --steam-debug for SDR diagnostics
 - `SteamMMO_0.0004.zip` -- 44145720 bytes -- sha256 `7bb65b70009e6b6b54f19683cd1fc8c6ddca80d79432804c4a83bd5f5b8295bd`
 
+## 0.0005 -- 2026-09-28 07:21
+
+- Quest loop: giver offers a job, pickups collect, hand-in pays XP and bread. HUD tracker (level/XP/quest line/key hint). 60 tests, 145 asserts.
+- `SteamMMO_0.0005.zip` -- 44163249 bytes -- sha256 `dc96aa298414da70204f6428ccaa2c0e01f21e3b11dd978c2fa0c2c7bce4af1b`
+

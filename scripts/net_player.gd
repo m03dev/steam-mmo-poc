@@ -1,3 +1,4 @@
+class_name NetPlayer
 extends Node
 ## Network adapter for the vendored third-person character.
 ## ============================================================================

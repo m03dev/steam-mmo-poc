@@ -1,0 +1,40 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/quest_tracker.gd" id="1_tracker"]
+[ext_resource type="Theme" path="res://ui/ui_theme.tres" id="2_theme"]
+
+[node name="QuestTracker" type="CanvasLayer"]
+layer = 15
+script = ExtResource("1_tracker")
+
+[node name="Panel" type="PanelContainer" parent="."]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 292.0
+offset_bottom = 152.0
+theme = ExtResource("2_theme")
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+theme_override_constants/separation = 3
+
+[node name="LevelLabel" type="Label" parent="Panel/VBox"]
+text = "Level 1"
+
+[node name="XPBar" type="ProgressBar" parent="Panel/VBox"]
+custom_minimum_size = Vector2(248, 8)
+show_percentage = false
+
+[node name="XPLabel" type="Label" parent="Panel/VBox"]
+text = "0 / 100 XP"
+
+[node name="QuestLabel" type="Label" parent="Panel/VBox"]
+text = "No quest"
+
+[node name="PromptLabel" type="Label" parent="."]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -76.0
+offset_bottom = -44.0
+theme = ExtResource("2_theme")
+horizontal_alignment = 1

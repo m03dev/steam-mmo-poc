@@ -1,6 +1,8 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/level.gd" id="1_level"]
+[ext_resource type="Script" path="res://scripts/quest_giver.gd" id="2_giver"]
+[ext_resource type="Script" path="res://scripts/item_pickup.gd" id="3_pickup"]
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
@@ -26,6 +28,19 @@ size = Vector3(3, 3, 3)
 
 [sub_resource type="BoxShape3D" id="Shape_trigger"]
 size = Vector3(3, 3, 3)
+
+[sub_resource type="CapsuleMesh" id="Mesh_giver"]
+radius = 0.5
+height = 2.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_giver"]
+albedo_color = Color(0.85, 0.45, 0.15, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_pickup"]
+size = Vector3(0.6, 0.6, 0.6)
+
+[sub_resource type="StandardMaterial3D" id="Mat_pickup"]
+albedo_color = Color(0.95, 0.85, 0.25, 1)
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_level")
@@ -89,3 +104,44 @@ mesh = SubResource("Mesh_trigger")
 
 [node name="Shape" type="CollisionShape3D" parent="Trigger"]
 shape = SubResource("Shape_trigger")
+
+[node name="QuestGiver" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -6)
+script = ExtResource("2_giver")
+prompt_verb = "Talk"
+display_name = "Trader Vex"
+marker_text = "!"
+quest_id = "pelts"
+
+[node name="Mesh" type="MeshInstance3D" parent="QuestGiver"]
+mesh = SubResource("Mesh_giver")
+surface_material_override/0 = SubResource("Mat_giver")
+
+[node name="Pickups" type="Node3D" parent="."]
+
+[node name="Pickup1" type="Node3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.4, 6)
+script = ExtResource("3_pickup")
+item_id = "wolf_pelt"
+
+[node name="Mesh" type="MeshInstance3D" parent="Pickups/Pickup1"]
+mesh = SubResource("Mesh_pickup")
+surface_material_override/0 = SubResource("Mat_pickup")
+
+[node name="Pickup2" type="Node3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0.4, 7)
+script = ExtResource("3_pickup")
+item_id = "wolf_pelt"
+
+[node name="Mesh" type="MeshInstance3D" parent="Pickups/Pickup2"]
+mesh = SubResource("Mesh_pickup")
+surface_material_override/0 = SubResource("Mat_pickup")
+
+[node name="Pickup3" type="Node3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.4, -10)
+script = ExtResource("3_pickup")
+item_id = "wolf_pelt"
+
+[node name="Mesh" type="MeshInstance3D" parent="Pickups/Pickup3"]
+mesh = SubResource("Mesh_pickup")
+surface_material_override/0 = SubResource("Mat_pickup")
