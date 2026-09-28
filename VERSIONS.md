@@ -18,3 +18,8 @@ different size, and that is the quickest way to catch it.
 - Start screen + compact dev HUD; right-click camera peek removed; live ping/peers readout over the Steam relay
 - `SteamMMO_0.0001.zip` -- 44140665 bytes -- sha256 `f4acd7278a00b50665ed327d3e5da574ee2582a1b7662ea798b0243e7897e44b`
 
+## 0.0002 -- 2026-09-28 06:52
+
+- Fix the Steam connection-status read (wrong dict key meant it never reported) and document the first-import step
+- `SteamMMO_0.0002.zip` -- 44142307 bytes -- sha256 `07b0d9596b27a70e150d7dd37d6995c19c1586beeabc03df5ea0d74a97cb2abf`
+

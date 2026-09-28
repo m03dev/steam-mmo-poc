@@ -31,7 +31,19 @@ const MAX_MEMBERS: int = 8
 ## Steam lobby metadata keys (stored as strings inside the lobby's data).
 const KEY_TYPE: String = "lobby_type"
 const KEY_VERSION: String = "game_version"
-const GAME_VERSION: String = "0.0.1"
+const KEY_PROTOCOL: String = "protocol"
+
+## The release this build is. `tools/release.sh` keeps it in step with res://VERSION.
+## It is baked in as a const on purpose: res://VERSION is a loose text file that may
+## not be packed into an exported build, whereas a const always is. Published in the
+## lobby and in each member's own data, so both sides can read what they are talking to.
+const GAME_VERSION: String = "0.0003"
+
+## Wire-protocol revision. Bump this when - and only when - the set of @rpc methods
+## or their signatures changes. Two builds with the same protocol talk to each other
+## whatever their version strings say, and a real mismatch is reported on join
+## instead of surfacing later as a phantom bug.
+const PROTOCOL_VERSION: int = 1
 
 ## Steam result code: EResult.k_EResultOK == 1. Used to validate the async
 ## lobby create/join "tells". NOTE: the lobby *type* is passed as Steam's own
@@ -59,6 +71,11 @@ var _autojoin_attempt: int = 0
 
 
 func _ready() -> void:
+	# Identity first, so every log carries the build that produced it.
+	print("[NetworkManager] SteamMMO v%s | netcode protocol %d" % [GAME_VERSION, PROTOCOL_VERSION])
+	# MultiplayerAPI signal, not the peer's, so this survives every peer swap.
+	multiplayer.peer_connected.connect(_on_multiplayer_peer_connected)
+
 	# Steam-side signals: lobby results.
 	if Engine.has_singleton("Steam"):
 		Steam.lobby_created.connect(_on_steam_lobby_created)
@@ -198,9 +215,11 @@ func _on_steam_lobby_created(connect_result: int, lobby_id: int) -> void:
 	# Tag the lobby BEFORE hosting so joiners can find/identify it by type.
 	Steam.setLobbyData(lobby_id, KEY_TYPE, current_lobby_type)
 	Steam.setLobbyData(lobby_id, KEY_VERSION, GAME_VERSION)
+	Steam.setLobbyData(lobby_id, KEY_PROTOCOL, str(PROTOCOL_VERSION))
 	Steam.setLobbyMemberLimit(lobby_id, MAX_MEMBERS)
 	Steam.setLobbyJoinable(lobby_id, true)
 	Steam.setLobbyMemberData(lobby_id, "name", SteamManager.persona_name)
+	_publish_member_build(lobby_id)
 
 	# Create the SDR peer and host it on this lobby.
 	peer = SteamMultiplayerPeer.new()
@@ -242,6 +261,8 @@ func _on_steam_lobby_joined(lobby_id: int, _permissions: int, _locked: bool, res
 	current_lobby_type = Steam.getLobbyData(lobby_id, KEY_TYPE)
 	is_host = false
 	Steam.setLobbyMemberData(lobby_id, "name", SteamManager.persona_name)
+	_publish_member_build(lobby_id)
+	_report_host_build(lobby_id)
 
 	peer = SteamMultiplayerPeer.new()
 	peer.set_server_relay(true)
@@ -260,6 +281,56 @@ func _on_steam_lobby_joined(lobby_id: int, _permissions: int, _locked: bool, res
 	print("[NetworkManager] Joined '%s' lobby %d. My peer id: %d." % [
 			current_lobby_type, lobby_id, multiplayer.get_unique_id()])
 	lobby_joined.emit(lobby_id)
+
+
+#region Build identity -----------------------------------------------------------
+
+## Tell the rest of the lobby which build this is. Member data is read by the host
+## when someone connects, so a mismatch is visible from the host's own log.
+func _publish_member_build(lobby_id: int) -> void:
+	Steam.setLobbyMemberData(lobby_id, "version", GAME_VERSION)
+	Steam.setLobbyMemberData(lobby_id, "protocol", str(PROTOCOL_VERSION))
+
+
+## Read the HOST's advertised build and print it beside our own. The host's copy is
+## lobby data written before hosting, so it is the one side of the comparison that
+## is reliably available the moment we join.
+func _report_host_build(lobby_id: int) -> void:
+	var host_game: String = Steam.getLobbyData(lobby_id, KEY_VERSION)
+	var host_protocol: String = Steam.getLobbyData(lobby_id, KEY_PROTOCOL)
+	print("[NetworkManager] Build check - host: game %s protocol %s | ours: game %s protocol %d" % [
+			host_game if host_game != "" else "unknown",
+			host_protocol if host_protocol != "" else "unknown",
+			GAME_VERSION, PROTOCOL_VERSION])
+	if host_protocol != "" and int(host_protocol) != PROTOCOL_VERSION:
+		push_error("[NetworkManager] BUILD MISMATCH: host speaks protocol %s, this build speaks %d. The @rpc set differs, so one of the two is stale." % [
+				host_protocol, PROTOCOL_VERSION])
+
+
+## Host side: say who attached and what they claimed to be. What the peer published
+## may not have reached us yet, so "unreported" is not a failure - the peer's own
+## "Build check" line is the authoritative one.
+func _on_multiplayer_peer_connected(peer_id: int) -> void:
+	if not is_host or current_lobby_id == 0:
+		return
+	var steam_id: int = 0
+	if peer is SteamMultiplayerPeer:
+		steam_id = (peer as SteamMultiplayerPeer).get_steam_id_for_peer_id(peer_id)
+	var who: String = "peer %d" % peer_id
+	var build: String = "unreported"
+	if steam_id != 0:
+		who = Steam.getFriendPersonaName(steam_id)
+		var their_game: String = Steam.getLobbyMemberData(current_lobby_id, steam_id, "version")
+		var their_protocol: String = Steam.getLobbyMemberData(current_lobby_id, steam_id, "protocol")
+		if their_game != "" or their_protocol != "":
+			build = "game %s protocol %s" % [their_game, their_protocol]
+	print("[NetworkManager] %s attached (peer %d, steamid %d) - its build: %s" % [
+			who, peer_id, steam_id, build])
+	if build.contains("protocol") and not build.ends_with(str(PROTOCOL_VERSION)):
+		push_error("[NetworkManager] BUILD MISMATCH on peer %d: it reports %s, we speak protocol %d." % [
+				peer_id, build, PROTOCOL_VERSION])
+
+#endregion
 
 
 func _on_steam_lobby_match_list(lobbies: Array) -> void:

@@ -32,6 +32,16 @@ next="$(printf '0.%04d' "$((index + 1))")"
 
 echo "==> release $next  ($NOTE)"
 
+# --- keep the compiled build identity in step ----------------------------------
+# GAME_VERSION is a const inside NetworkManager.gd, because an exported .pck does
+# not reliably ship res://VERSION - so it has to be written here, or the running
+# game would report a version that is not the one it is.
+net_mgr="$PROJECT_DIR/autoload/NetworkManager.gd"
+sed -i '' -E "s/(const GAME_VERSION: String = \")[^\"]*(\")/\1$next\2/" "$net_mgr"
+grep -q "const GAME_VERSION: String = \"$next\"" "$net_mgr" \
+	|| { echo "could not set GAME_VERSION to $next in NetworkManager.gd" >&2; exit 1; }
+echo "==> GAME_VERSION in NetworkManager.gd set to $next"
+
 # --- build ---------------------------------------------------------------------
 echo "==> exporting '$PRESET'"
 "$GODOT" --headless --path "$PROJECT_DIR" --export-release "$PRESET" "$BUILD_DIR/SteamMMO.exe" >/dev/null
