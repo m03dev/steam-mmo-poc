@@ -143,6 +143,14 @@ func log_event(text: String) -> void:
 		rpc("_net_log", text)
 
 
+## Say something only THIS peer needs to read: a notice about what is possible here,
+## not an event in the world. Unlike log_event() it is not broadcast and has no
+## authority requirement, so any peer may call it -- which is what a client needs in
+## order to explain why a local action was refused.
+func log_local(text: String) -> void:
+	_net_log(text)
+
+
 @rpc("authority", "call_local", "reliable")
 func _net_log(text: String) -> void:
 	combat_log.append(text)

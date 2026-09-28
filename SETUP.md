@@ -40,26 +40,42 @@ The entry scene is `res://ui/start_screen.tscn`:
     Godot --path . -- --host-world                   # skip the menu, host the world
     Godot --path . -- --host-dungeon
     Godot --path . -- --offline                      # needs no Steam
+    Godot --path . -- --host-direct                  # multiplayer with NO Steam: plain ENet
+    Godot --path . -- --join-direct=192.168.1.20     # join that host (bare flag = localhost)
 
 Hosting prints the lobby id. A second peer joins by typing that id into the
-Lobby ID box on the start screen and pressing Join. The launch arguments are
-host-only - there is no join-by-id launch argument yet.
+Lobby ID box on the start screen and pressing Join (there is no join-by-id
+launch argument). Direct IP is the no-Steam alternative: *Host Direct* opens a
+UDP port (printed on the start screen) and the other player types that machine's
+address into *Join Direct*. LAN needs nothing set up; over the internet the host
+forwards that port (default 23460, or `--direct-port=N`). Direct-IP sessions are
+world-only - a dungeon is a second session found through Steam's lobby list - and
+they cannot work in a Web build, where a browser has no UDP socket.
 
 ## Tests
 GUT, configured by `.gutconfig.json`:
 
-    Godot --headless --path . -s addons/gut/gut_cmdln.gd -gexit
+    Godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests/unit -gexit -glog=1
 
-Expect 12 tests / 32 asserts.
+Read the summary line rather than a count written here, which goes stale: what
+matters is `Failing Tests  0`. (At the time of writing: 161 tests, 359 asserts,
+about 7 s.) Use the **CLI**, never the editor's GUT panel - in this project the
+in-editor runner reports green for a test containing `assert_true(false)`.
 
 ## Two peers on one machine, no Steam
-`res://tests/two_peer_harness.tscn` runs an ENet pair on port 23457:
+The real game, not a harness - two processes, no lobby, no Steam account needed:
 
-    Godot --headless --path . res://tests/two_peer_harness.tscn -- --host
-    Godot --headless --path . res://tests/two_peer_harness.tscn -- --client
+    Godot --headless --path . -- --host-direct
+    Godot --headless --path . -- --join-direct=127.0.0.1
 
-That exercises replication, the per-peer spawn offsets, the world/dungeon swap
-and the NetStats RPC ping. It does not exercise Steam's SDR path.
+Both load `res://scenes/Main.tscn`; the host spawns `player_1` and
+`player_<client id>` and each side sees both. A second instance on the same
+machine needs `--direct-port=23461` to avoid fighting over the port.
+
+`res://tests/two_peer_harness.tscn` remains for a narrower, scripted ENet pair on
+port 23457 (`-- --host` / `-- --client`); it exercises replication, the per-peer
+spawn offsets, the world/dungeon swap and the NetStats RPC ping, but it is not the
+game shell. Neither path exercises Steam's SDR relay.
 
 ## Two peers on Steam
 They must be on **two different Steam accounts.** A Steam lobby is keyed by

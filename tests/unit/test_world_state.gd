@@ -106,6 +106,30 @@ func test_a_line_lands_in_the_log_and_is_announced() -> void:
 	assert_signal_emitted(WorldState, "combat_event", "and broadcast to the HUD")
 
 
+func test_a_local_notice_lands_on_a_client_where_a_world_event_would_not() -> void:
+	# log_event() is server-only, so a joining client cannot use it to explain why an
+	# action was refused. log_local() must land on whichever peer calls it: proven by
+	# putting this peer in a client's shoes and asking both for a line.
+	var saved_peer: MultiplayerPeer = multiplayer.multiplayer_peer
+	var client_peer: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
+	# A plain outgoing dial is enough to stop being "server 1". Nothing needs to be
+	# listening, and the peer is closed again before the test ends so no failure
+	# report from it can surface in a later test.
+	client_peer.create_client("127.0.0.1", 24118)
+	multiplayer.multiplayer_peer = client_peer
+	watch_signals(WorldState)
+	var world_line: String = "server-only line (%d)" % randi()
+	var local_line: String = "local line (%d)" % randi()
+	WorldState.log_event(world_line)
+	WorldState.log_local(local_line)
+	assert_false(WorldState.recent(80).has(world_line),
+			"log_event is server-only, and that is deliberate")
+	assert_true(WorldState.recent(80).has(local_line), "a local notice lands anyway")
+	assert_signal_emitted(WorldState, "combat_event", "and reaches this peer's HUD")
+	client_peer.close()
+	multiplayer.multiplayer_peer = saved_peer
+
+
 func test_recent_returns_the_newest_lines_last() -> void:
 	var first: String = "first %d" % randi()
 	var second: String = "second %d" % randi()

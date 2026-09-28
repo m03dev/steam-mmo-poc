@@ -23,6 +23,14 @@ static typing everywhere). Shared open world, a dungeon you walk into, quests, a
 inventory, mobs with server-authoritative AI, in-game chat. Networking is **Steam P2P
 over the SDR relay** — host-authoritative, no dedicated server.
 
+There is also a **direct-IP transport** (plain ENet, no Steam at all) for builds that have
+no Steam: `NetworkManager.host_direct()` / `join_direct()`, the start screen's two direct
+controls, and `--host-direct` / `--join-direct=ADDR` / `--direct-port=N`. It is the same
+game, one swapped peer object — **no wire-format change, no protocol bump**. It is
+**world-only** (a dungeon is a second session found via Steam's lobby list) and cannot
+exist in a browser build (no raw UDP there). `NetworkManager.gd` is still the only file
+that knows which transport is in use.
+
 - Entry scene: `ui/start_screen.tscn`. Game shell: `scenes/Main.tscn` (persistent; swaps
   `World.tscn` <-> `Dungeon.tscn` underneath itself).
 - Autoloads: `SteamManager`, `NetworkManager`, `NetStats`, `WorldState`, `Chat`.
@@ -78,6 +86,23 @@ $G --headless --path . res://tests/game_chat_two_peer.tscn -- --host      # two-
 $G --headless --path . res://tests/game_chat_two_peer.tscn -- --client
 ```
 
+**Two real peers on ONE machine, with no Steam, is now the cheapest end-to-end check** — and
+it is the only way a single agent can watch a host and a client at once, since two processes
+on one Mac share one Steam account and therefore cannot be two Steam peers:
+
+```bash
+$G --headless --path . -- --host-direct                    > /tmp/h.log 2>&1 &
+$G --headless --path . -- --join-direct=127.0.0.1          > /tmp/c.log 2>&1 &
+# host: "Hosting a DIRECT session on UDP 23460 (no Steam). My peer id: 1."
+# client: "Dialling a DIRECT session at 127.0.0.1:23460 ..." then "Connected to host."
+# both: "[Level/world] ready ..." and the host spawns player_1 and player_<client id>
+```
+
+`--direct-port=N` lets a second instance register in the process list next to a host already
+on 23460. Read both logs and check `grep -cE '^ERROR' ` is **0** — a stray engine error is how
+the `_ready`-time scene-swap bug was caught (see section 5). This runs the real `Main.tscn`,
+not a harness, so it exercises the actual spawner, synchronizers and chat.
+
 **The unit tests: use GUT's CLI, never the in-editor runner.**
 
 ```bash
@@ -88,6 +113,15 @@ The in-editor runner in this project is **broken in a way that lies**: every tes
 gets `gut == null`, so `add_child_autofree` fails and assertions silently pass. A probe
 containing `assert_true(false)` was reported as TESTS PASSED. Verify the harness before
 trusting a green run.
+
+Two GUT traps that cost real time here:
+
+- `assert_signal_emitted_with_parameters()`'s **4th argument is `index`, an int** — a message
+  string there is compared as an index and errors *inside GUT*, not in your test.
+- GUT **fails a test on any engine error or `push_error`** raised during it. So a test that
+  legitimately creates a peer (a direct dial) must close it **before the test ends**, or its
+  asynchronous failure report surfaces during a later test. Use `push_warning`, not
+  `push_error`, for ordinary user-input refusals.
 
 A tree delivered from outside (a snapshot, a copied addon) needs **one `--import` pass**
 before anything resolves: `$G --headless --path . --import`.
@@ -122,6 +156,13 @@ Read these before debugging something that is not broken:
   up children"). Add under `self`, or `call_deferred`.
 - **`change_scene_to_file()` frees the node doing the reporting** — install monitors on
   `/root`, not on the scene being replaced, or you will debug a client that "went silent".
+- **`change_scene_to_file()` also removes the current scene IMMEDIATELY**, so calling it
+  from `_ready()` errors with *"Parent node is busy adding/removing children"*. This hid
+  for weeks because the Steam path only ever reaches its handover through a signal that
+  arrives a frame later; a **direct host** and **`--offline`** hit it head-on. The start
+  screen now defers the call (`change_scene_to_file.call_deferred(...)`). If you add a
+  session path that reports **synchronously**, expect this class of bug — and run the game
+  once headless and `grep -c '^ERROR'`.
 - **The default font has no tick glyphs** — use letters for world markers ("OK"), checked
   with `has_char`.
 - **macOS has no `timeout`** — use `sleep N` + `kill`. A killed process **loses buffered

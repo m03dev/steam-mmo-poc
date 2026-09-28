@@ -27,6 +27,14 @@ tested; the App ID itself is a one-line file change (`steam_appid.txt`), gated o
   onto `SteamMultiplayerPeer` with the Valve relay forced on (`set_server_relay(true)`): no port
   forwarding, no NAT pain. Public on the shared dev App ID, **friends-only** once the build is on
   its own App ID.
+- **Direct IP, without Steam** — the same game over plain **ENet**, for builds that have no Steam:
+  *Host Direct (IP, no Steam)* and a *Join Direct* address field on the start screen, or
+  `--host-direct` / `--join-direct=ADDR` (`--direct-port=N` to pick the port; default 23460). LAN
+  needs nothing set up; across the internet the host forwards that port. This is the transport an
+  itch.io download uses. **No protocol change** — it swaps the peer object, so the two transports
+  interoperate. Two limits: direct-IP play is **world-only** (a dungeon is a second session found
+  through Steam's lobby list, so the trigger refuses and says why), and it cannot work in the
+  **Web build**, where a browser cannot open a UDP socket.
 - **Invites** — Steam draws its own friends list (`invite_friends()`); rich presence publishes
   `connect = +connect_lobby <id>`, which is what puts *Join Game* in a friend's list, and launching
   with `+connect_lobby <id>` (how Steam starts the game when a friend clicks Join while it is
@@ -72,6 +80,15 @@ routed by SteamID, so two instances of the same account collide).
 - **Editor:** press F5.
 - **Offline** (no Steam at all): the start screen's *Play Offline* runs the whole single-player
   loop, mobs and quests included.
+- **Multiplayer without Steam:** one player presses *Host Direct* (it shows the port it opened),
+  the other types that machine's address into *Join Direct*. On one machine, or for testing,
+  two instances can run at once — the second needs `--direct-port=23461` so they do not fight
+  over the port:
+
+  ```bash
+  Godot --path . -- --host-direct
+  Godot --path . -- --join-direct=127.0.0.1
+  ```
 
 Controls: **WASD** to move, **F** attack, **E** interact, **I** inventory, **Enter** chat, **F3**
 dev overlay. Walk into the tall block at the far end of the world to enter the dungeon; the exit

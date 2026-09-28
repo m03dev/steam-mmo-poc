@@ -96,6 +96,28 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 34)
 text = "Join Lobby"
 
+[node name="DirectHostRow" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 8
+
+[node name="DirectHostButton" type="Button" parent="Center/Panel/VBox/DirectHostRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(560, 0)
+text = "Host Direct (IP, no Steam)"
+
+[node name="DirectRow" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 8
+
+[node name="DirectAddressInput" type="LineEdit" parent="Center/Panel/VBox/DirectRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(384, 0)
+placeholder_text = "Host IP to join (blank = this machine)"
+caret_blink = true
+
+[node name="DirectJoinButton" type="Button" parent="Center/Panel/VBox/DirectRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 34)
+text = "Join Direct"
+
 [node name="Status" type="Label" parent="Center/Panel/VBox"]
 unique_name_in_owner = true
 theme_override_colors/font_color = Color(0.607843, 0.811765, 0.964706, 1)

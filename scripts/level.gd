@@ -198,7 +198,14 @@ func _on_trigger_entered(body: Node3D) -> void:
 		return
 	if body is CharacterBody3D and multiplayer.multiplayer_peer != null \
 			and body.is_multiplayer_authority():
-		_transitioning = true
 		var target: String = NetworkManager.TYPE_DUNGEON if level_type == NetworkManager.TYPE_WORLD else NetworkManager.TYPE_WORLD
+		# A dungeon is a second session found through Steam's lobby list, so a direct
+		# (no-Steam) link cannot reach one. Say so in the log the player is already
+		# reading, and leave the trigger armed: if this session later becomes a Steam
+		# one, walking back in should still work.
+		if NetworkManager.is_direct_session():
+			WorldState.log_local("Dungeons need a Steam session -- direct-IP play is world-only.")
+			return
+		_transitioning = true
 		print("[Level] '%s' trigger hit -> transitioning to '%s'." % [level_type, target])
 		NetworkManager.transition_to_lobby_type(target)

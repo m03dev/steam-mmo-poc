@@ -13,28 +13,52 @@ a POC that friends should be able to play, itch is the shortest path from here t
 Costs nothing to have, and it does not compete with Steam: the same Windows zip can go to
 both.
 
-## The one real obstacle
+## The one real obstacle — solved (desktop), with two honest limits
 
-**Multiplayer in this game runs over Steam.** So an itch build today is **single-player
-only** — a friend downloads it, walks around, fights wolves, does the quest, but cannot see
-anyone else. That is a property of the transport we chose, not of itch.
+**Multiplayer in this game ran over Steam**, so an itch build was going to be single-player
+only. That is no longer true for the **downloaded** builds: there is now a **direct-IP
+transport** (plain ENet) that needs no Steam at all.
 
-There is a clean fix, and it is already proven to be possible:
+It was a small change precisely because the seam was already right — `autoload/NetworkManager.gd`
+was the only file that knew what a Steam peer is:
 
-- `autoload/NetworkManager.gd` is the **only** file that knows what a Steam peer is.
-- `tests/game_chat_two_peer.gd` already runs the **entire real game** — server, spawner,
-  synchronizers, chat — over plain **ENet**, with no Steam in the process.
+- `NetworkManager.host_direct(port)` / `NetworkManager.join_direct(address, port)` set an
+  `ENetMultiplayerPeer` on `multiplayer` instead of a `SteamMultiplayerPeer`. `var peer` is
+  now typed `MultiplayerPeer` (the base of both), and the Steam-only calls take a typed
+  local, so nothing above this file changed.
+- Start screen: **Host Direct (IP, no Steam)** and a **Join Direct** address field. Both stay
+  enabled when Steam is missing — that is their whole reason to exist.
+- Headless / scripted entry, which is how two peers get tested:
+  `-- --host-direct` and `-- --join-direct=192.168.1.20` (bare `--join-direct` = localhost);
+  `--direct-port=N` when two instances share one machine. Default port **23460**.
+- A dungeon is a *second* session found through Steam's lobby list, so it cannot exist over a
+  direct link: the trigger now refuses, **keeps the session up**, and says so in the combat
+  log. Direct-IP play is **world-only**.
 
-So a third transport ("host by IP / join by IP") is a matter of adding a sibling path in
-that one file plus a couple of fields on the start screen. It is a **new RPC-bearing code
-path only if it changes the wire format** — it does not; it swaps the peer object — so it
-should *not* need a `PROTOCOL_VERSION` bump. Verify that claim before deciding.
+**Verified, live:** two real game processes on this Mac, `--host-direct` and
+`--join-direct=127.0.0.1` — both load the real `Main.tscn` shell, the host spawns
+`player_1` and `player_<id>`, the client sees both, and **zero errors** on either side. The
+Steam path was re-run afterwards to prove it still works (lobby created, host peer created,
+world loaded). Unit suite: **161/161**, of which 11 are new (`tests/unit/test_direct_transport.gd`).
 
-**Until that exists, be honest on the itch page**: "single-player preview; multiplayer
-needs the Steam build." Never quietly ship a build that silently cannot find other players
-— the friends-only lobby trap already taught that lesson.
+**No `PROTOCOL_VERSION` bump**, and this was checked rather than assumed: nothing on the wire
+carries a Steam id — `scripts/` never consults one, and `autoload/NetStats.gd` already falls
+back when a peer is not a `SteamMultiplayerPeer`. The transport swaps the peer object, not the
+format. (Protocol stays 3.)
 
-Status: **not started.** It is the first item in the itch plan below.
+### The two limits to state on the page
+
+1. **The browser build cannot do it.** A browser cannot open a raw UDP socket, so ENet cannot
+   exist there. The Web build is **single-player by nature**; the start screen disables the
+   direct buttons on that platform and says why. Multiplayer on itch means the **Windows /
+   macOS downloads**.
+2. **LAN is free; the open internet is not.** Two machines on one network connect by typing an
+   address. Across the internet the host must forward port 23460 (or use a VPN) — there is no
+   relay doing it for us, unlike Steam's SDR. The refusal message says this out loud.
+
+**So be honest on the itch page**: "Multiplayer (windows/macos download): host over IP, or use
+the Steam build. Browser build is a single-player preview." Never quietly ship a build that
+silently cannot find other players — the friends-only lobby trap already taught that lesson.
 
 ## What Mohamed has to do (about two minutes, and only he can)
 
@@ -134,7 +158,7 @@ handles that by design, `autoload/SteamManager.gd` checks for the Steam singleto
 Push it to the page once the slug exists:
 
 ```bash
-~/Applications/butler/butler push build/web <user>/<slug>:html5 --userversion 0.0009
+~/Applications/butler/butler push build/web <user>/<slug>:html5 --userversion <version>
 ```
 
 itch wants the **folder** for an HTML5 game, not a zip, and it must contain `index.html`.
@@ -151,8 +175,10 @@ itch wants the **folder** for an HTML5 game, not a zip, and it must contain `ind
     else is online.
 
     This is a prototype, not a game: the world is blockout geometry, there is no art
-    pass, and things will break. Single-player works in this build; multiplayer runs in
-    the Steam build because it currently uses Steam to find and connect players.
+    pass, and things will break. In the windows/macos download you can host over your
+    own IP and have a friend join (same network: just the address; across the internet:
+    port 23460 forwarded), or play the Steam build. The browser build below is a
+    single-player preview -- a browser cannot open the kind of socket this game uses.
 
 Screenshots: take them with `run_scene` (the game's own camera is nicer than a mockup) —
 world with a wolf, a dungeon, the quest tracker as it ticks up, the chat box with a real
@@ -160,8 +186,11 @@ line. itch shows the first four on the page, so the first one should be the wide
 
 ## Checklist, in order
 
-- [ ] **1. Direct-IP ENet transport** so an itch build can play multiplayer (prerequisite
-      for the page saying "multiplayer" at all). — *owner: Castor, not started*
+- [x] **1. Direct-IP ENet transport** so a downloaded itch build can play multiplayer with no
+      Steam at all. **Done and verified live** (two processes, no lobby, both in the world);
+      161/161 unit tests pass; protocol unchanged at 3. Two limits stand: the **browser build
+      stays single-player** (no UDP in a browser) and direct-IP play is **world-only** (a
+      dungeon needs a Steam session). — *owner: Castor, done*
 - [x] **1b. Browser build** — exported, files complete, boots in a browser. **One human
       check left**: open it once in a real browser and confirm it reaches the start screen
       and plays offline (see the section above). — *owner: Mohamed, 10 seconds*

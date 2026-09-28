@@ -12,6 +12,7 @@ const GAME_SCENE: String = "res://scenes/Main.tscn"
 @onready var _status: Label = %Status
 @onready var _lobby_id_input: LineEdit = %LobbyIdInput
 @onready var _join_button: Button = %JoinButton
+@onready var _direct_address_input: LineEdit = %DirectAddressInput
 
 ## Set from the command line, then consumed once Steam is ready. See
 ## _read_launch_action().
@@ -24,6 +25,8 @@ func _ready() -> void:
 	%HostDungeonButton.pressed.connect(_host.bind(NetworkManager.TYPE_DUNGEON))
 	%AutoDungeonButton.pressed.connect(_auto_join.bind(NetworkManager.TYPE_DUNGEON))
 	_join_button.pressed.connect(_on_join_pressed)
+	%DirectHostButton.pressed.connect(_host_direct)
+	%DirectJoinButton.pressed.connect(_join_direct)
 	%OfflineButton.pressed.connect(_enter_game)
 	%QuitButton.pressed.connect(get_tree().quit)
 
@@ -31,6 +34,10 @@ func _ready() -> void:
 	NetworkManager.lobby_joined.connect(_on_lobby_ready)
 	NetworkManager.lobby_create_failed.connect(_on_session_failed)
 	NetworkManager.lobby_join_failed.connect(_on_session_failed)
+	# Direct (non-Steam) sessions have no lobby, so they report through their own
+	# signal; `connection_failed` is the shared "the dial went nowhere" case.
+	NetworkManager.direct_session_started.connect(_on_direct_session_started)
+	NetworkManager.connection_failed.connect(_on_direct_failed)
 	# A friend pressed "Join Game" for us while we were still sitting on this menu.
 	# That is a complete instruction, so it bypasses the menu entirely.
 	NetworkManager.join_invited.connect(_on_join_invited)
@@ -49,9 +56,15 @@ func _ready() -> void:
 ## --host-dungeon, --play and --offline are accepted too.
 func _read_launch_action() -> String:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
-	for action: String in ["--host-world", "--host-dungeon", "--play", "--offline"]:
+	for action: String in ["--host-world", "--host-dungeon", "--play", "--offline",
+			"--host-direct"]:
 		if args.has(action):
 			return action
+	# --join-direct carries an address, so it is matched by prefix:
+	#   --join-direct=192.168.1.20      (bare --join-direct means localhost)
+	for arg: String in args:
+		if arg.begins_with("--join-direct"):
+			return arg
 	return ""
 
 
@@ -69,6 +82,11 @@ func _run_launch_action() -> void:
 			_play()
 		"--offline":
 			_enter_game()
+		"--host-direct":
+			_host_direct()
+		_:
+			if action.begins_with("--join-direct"):
+				_join_direct_to(action.trim_prefix("--join-direct").trim_prefix("="))
 
 
 ## The one button a player actually needs.
@@ -101,6 +119,58 @@ func _on_join_pressed() -> void:
 	NetworkManager.join_lobby(int(text))
 
 
+## Host a direct-IP session: plain ENet, no Steam, no lobby. This is the path for
+## someone who downloaded the game and does not use Steam at all.
+func _host_direct() -> void:
+	_set_status("Opening a direct session on UDP %d..." % NetworkManager.direct_port)
+	NetworkManager.host_direct()
+
+
+## Join by IP. Accepts "host", "host:port", or a bare IPv4 address.
+func _join_direct() -> void:
+	_join_direct_to(_direct_address_input.text)
+
+
+func _join_direct_to(spec: String) -> void:
+	var parsed: Dictionary = NetworkManager.parse_direct_address(spec, NetworkManager.direct_port)
+	var address: String = str(parsed["address"])
+	if address.is_empty():
+		# An empty field usually means "the host is this machine", which is exactly
+		# what someone testing alone on one computer wants.
+		address = "127.0.0.1"
+	var port: int = int(parsed["port"])
+	_set_status("Connecting to %s:%d..." % [address, port])
+	NetworkManager.join_direct(address, port)
+
+
+func _on_direct_session_started(is_host: bool) -> void:
+	if is_host:
+		_enter_game()
+		return
+	_set_status("Connecting to the host...")
+	# Let ENet finish before entering the game. A client that starts the shell while
+	# still disconnected briefly believes it is peer 1 -- which is the server -- and
+	# the Steam path never sees that because joining a lobby means already connected.
+	if not multiplayer.connected_to_server.is_connected(_on_direct_connected):
+		multiplayer.connected_to_server.connect(_on_direct_connected)
+
+
+func _on_direct_connected() -> void:
+	if multiplayer.connected_to_server.is_connected(_on_direct_connected):
+		multiplayer.connected_to_server.disconnect(_on_direct_connected)
+	_enter_game()
+
+
+## A direct dial that went nowhere. There is no lobby list to blame it on, so name
+## the two things that actually cause it.
+func _on_direct_failed() -> void:
+	if not NetworkManager.is_direct_session():
+		return
+	_set_status("Could not reach the host. Check the IP, and that port %d is open on "
+			% NetworkManager.direct_port
+			+ "the host (LAN works as-is; the open internet needs it forwarded).")
+
+
 ## A lobby was created or joined -- the session now exists, so start the game.
 func _on_lobby_ready(_lobby_id: int) -> void:
 	_enter_game()
@@ -123,7 +193,12 @@ func _on_join_invited(_steam_id: int, lobby_id: int, accepted: bool) -> void:
 
 func _enter_game() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(GAME_SCENE)
+	# Deferred, not immediate: change_scene_to_file() removes the current scene right
+	# away, and the scene tree refuses to be modified while it is still busy adding
+	# children -- which is exactly where a launch action is when it starts this from
+	# _ready. The Steam path never showed the bug only because its signals arrive a
+	# frame later; a direct host and --offline both hit it head-on.
+	get_tree().change_scene_to_file.call_deferred(GAME_SCENE)
 
 
 func _on_steam_initialized(success: bool) -> void:
@@ -133,6 +208,17 @@ func _on_steam_initialized(success: bool) -> void:
 			%AutoDungeonButton, _join_button]:
 		button.disabled = not success
 	_lobby_id_input.editable = success
+	# The direct-IP controls are NOT gated on Steam -- they exist for people who have
+	# no Steam at all. They are gated on the platform instead: a browser cannot open
+	# a raw UDP socket, so ENet cannot exist in a web build, and offering it there
+	# would be a button that can never work.
+	var web_build: bool = OS.has_feature("web")
+	%DirectHostButton.disabled = web_build
+	%DirectJoinButton.disabled = web_build
+	_direct_address_input.editable = not web_build
+	if web_build:
+		_set_status("Browser build: single-player only (Play Offline). Steam and "
+				+ "direct-IP multiplayer need a downloaded desktop build.")
 	if success:
 		# A lobby Steam named at launch is a command, not an offer: a friend pressed
 		# "Join Game" for us, which is not something to be asked about. Straight in.
@@ -148,9 +234,10 @@ func _on_steam_initialized(success: bool) -> void:
 					+ "friends list, or by pasting the lobby id.")
 		_run_launch_action()
 	else:
-		_set_status("Steam is offline - multiplayer disabled. Use Play Offline.")
-		# Offline play needs nothing from Steam, so it can still start.
-		if _launch_action == "--offline":
+		_set_status("Steam is offline - direct IP and offline play still work.")
+		# Neither of these needs Steam, so either can still start.
+		if _launch_action == "--offline" or _launch_action == "--host-direct" \
+				or _launch_action.begins_with("--join-direct"):
 			_run_launch_action()
 
 
