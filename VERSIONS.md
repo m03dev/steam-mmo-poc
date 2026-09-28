@@ -43,3 +43,8 @@ different size, and that is the quickest way to catch it.
 - PLAY is the start button (auto-join the open world, or open one if nobody is playing). Quest giver's marker now changes to a green OK when the quest is handed in instead of vanishing. Quest HUD moved top-right, clear of the dev HUD. Marker lifted above the player name tag. Verified live: gold ! marker, [E] prompt, accept fires on a real key press.
 - `SteamMMO_0.0006.zip` -- 44163437 bytes -- sha256 `c70369e0b571ebdaec0d83d5cdae543a915af34fb9a1ac7efa1f787b6a97155b`
 
+## 0.0007 -- 2026-09-28 08:23
+
+- Enemies and combat: server-authoritative mob AI (aggro/chase/leash-evade), Health component, server-validated melee, WorldState globals (registry/clock/timers/combat log), combat log HUD. Split replication so server-owned state syncs from the server, not the owning client. Protocol 2.
+- `SteamMMO_0.0007.zip` -- 44180419 bytes -- sha256 `d5565c07ed190753ddb76c880296d2fc9d95307ba2518dfa60898372c2f46207`
+

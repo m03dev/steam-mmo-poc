@@ -1,0 +1,28 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/combat_log.gd" id="1_log"]
+[ext_resource type="Theme" path="res://ui/ui_theme.tres" id="2_theme"]
+
+[node name="CombatLog" type="CanvasLayer"]
+layer = 13
+script = ExtResource("1_log")
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -300.0
+offset_right = 336.0
+offset_bottom = -140.0
+theme = ExtResource("2_theme")
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+theme_override_constants/separation = 3
+
+[node name="Title" type="Label" parent="Panel/VBox"]
+theme_override_colors/font_color = Color(0.921569, 0.964706, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "Combat"
+
+[node name="Rows" type="VBoxContainer" parent="Panel/VBox"]
+theme_override_constants/separation = 2

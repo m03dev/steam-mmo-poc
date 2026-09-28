@@ -10,6 +10,8 @@ extends CanvasLayer
 ## completely decoupled from the level's node layout.
 
 @onready var _level_label: Label = $Panel/VBox/LevelLabel
+@onready var _hp_bar: ProgressBar = $Panel/VBox/HPBar
+@onready var _hp_label: Label = $Panel/VBox/HealthLabel
 @onready var _xp_bar: ProgressBar = $Panel/VBox/XPBar
 @onready var _xp_label: Label = $Panel/VBox/XPLabel
 @onready var _quest_label: Label = $Panel/VBox/QuestLabel
@@ -20,6 +22,7 @@ const NetPlayerScript: GDScript = preload("res://scripts/net_player.gd")
 
 var _state: PlayerState = null
 var _interactor: PlayerInteractor = null
+var _health: Health = null
 
 
 func _ready() -> void:
@@ -48,7 +51,23 @@ func _watch_local_player() -> void:
 		_interactor.prompt_changed.connect(_on_prompt_changed)
 		_on_prompt_changed(interactor.prompt())
 
+	# Hit points ride the same node as everything else the player owns, and are
+	# refreshed by Health's own signal -- whether the change came from the server
+	# or arrived over the wire, the tracker cannot tell and does not care.
+	_health = avatar.get_node_or_null("Health") as Health
+	if _health != null:
+		_health.changed.connect(_refresh_health)
+		_refresh_health(_health.current, _health.maximum)
+
 	_refresh()
+
+
+func _refresh_health(current: int, maximum: int) -> void:
+	_hp_bar.max_value = float(maxi(maximum, 1))
+	_hp_bar.value = float(current)
+	_hp_label.text = "%d / %d HP" % [current, maximum]
+	if current <= 0:
+		_hp_label.text = "Defeated - recovering..."
 
 
 func _refresh() -> void:

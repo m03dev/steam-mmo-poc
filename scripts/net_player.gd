@@ -42,6 +42,10 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	# Every copy of a player, including the puppets, announces itself to the world
+	# registry. On the server that is the complete cast, which is what the enemy AI
+	# reads instead of hunting through the scene tree.
+	WorldState.register_entity(WorldState.KIND_PLAYER, _character)
 	_retire_asset_hud()
 	# A null peer only happens mid-transition; is_multiplayer_authority() errors
 	# on it, so check first.
@@ -50,6 +54,10 @@ func _ready() -> void:
 		_setup_local_player()
 		return
 	_make_puppet()
+
+
+func _exit_tree() -> void:
+	WorldState.unregister_entity(WorldState.KIND_PLAYER, _character)
 
 
 ## The asset ships a large debug panel of its own; ui/dev_hud.tscn replaces it

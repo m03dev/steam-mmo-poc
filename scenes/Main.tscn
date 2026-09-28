@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://ui/dev_hud.tscn" id="2_devhud"]
 [ext_resource type="PackedScene" path="res://ui/quest_tracker.tscn" id="3_tracker"]
 [ext_resource type="PackedScene" path="res://ui/inventory_panel.tscn" id="4_inv"]
+[ext_resource type="PackedScene" path="res://ui/combat_log.tscn" id="5_log"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -13,5 +14,7 @@ script = ExtResource("1_main")
 [node name="QuestTracker" parent="." instance=ExtResource("3_tracker")]
 
 [node name="InventoryPanel" parent="." instance=ExtResource("4_inv")]
+
+[node name="CombatLog" parent="." instance=ExtResource("5_log")]
 
 [node name="DevHud" parent="." instance=ExtResource("2_devhud")]

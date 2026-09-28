@@ -1,9 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://PlayerCharacter/player_character_scene.tscn" id="1_character"]
 [ext_resource type="Script" path="res://scripts/net_player.gd" id="2_net"]
 [ext_resource type="Script" path="res://scripts/player_state.gd" id="3_state"]
 [ext_resource type="Script" path="res://scripts/player_interactor.gd" id="4_interactor"]
+[ext_resource type="Script" path="res://scripts/health.gd" id="5_health"]
+[ext_resource type="Script" path="res://scripts/player_combat.gd" id="6_combat"]
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_1"]
 properties/0/path = NodePath(".:position")
@@ -14,9 +16,14 @@ properties/1/spawn = true
 properties/1/replication_mode = 1
 properties/2/path = NodePath("VisualRoot:rotation")
 properties/2/replication_mode = 1
-properties/3/path = NodePath("Stats:net_state")
-properties/3/spawn = true
-properties/3/replication_mode = 1
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_2"]
+properties/0/path = NodePath("Stats:net_state")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath("Health:current")
+properties/1/spawn = true
+properties/1/replication_mode = 1
 
 [node name="Player" instance=ExtResource("1_character")]
 
@@ -28,6 +35,18 @@ replication_config = SubResource("SceneReplicationConfig_1")
 
 [node name="Stats" type="Node" parent="."]
 script = ExtResource("3_state")
+
+[node name="StateSynchronizer" type="MultiplayerSynchronizer" parent="Stats"]
+root_path = NodePath("../..")
+replication_config = SubResource("SceneReplicationConfig_2")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("5_health")
+maximum = 100
+current = 100
+
+[node name="Combat" type="Node" parent="."]
+script = ExtResource("6_combat")
 
 [node name="Interactor" type="Node" parent="."]
 script = ExtResource("4_interactor")

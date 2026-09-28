@@ -101,6 +101,27 @@ func _may_act_for(sender: int) -> bool:
 #endregion
 
 
+#region Server-side awards -------------------------------------------------------
+
+## Hand out XP for something that is not a quest hand-in -- a kill, a discovery,
+## anything. Server-only: XP is worth handing yourself, so nobody else may.
+## Goes through the same _publish() path as everything else, which is why a kill
+## lights up every peer's XP bar with no extra plumbing.
+func award_xp(amount: int, reason: String = "") -> void:
+	if not is_server() or amount <= 0:
+		return
+	var level_before: int = progress.level
+	progress.grant_xp(amount)
+	print("[PlayerState/%d] +%d XP%s | level %d%s" % [
+			peer_id(), amount,
+			" (%s)" % reason if reason != "" else "",
+			progress.level,
+			" (LEVEL UP)" if progress.level > level_before else ""])
+	_publish()
+
+#endregion
+
+
 #region Requests (called by any peer, honoured by the server) --------------------
 
 ## Client entry points. On the server these run inline; on a client they are

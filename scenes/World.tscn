@@ -45,6 +45,7 @@ albedo_color = Color(0.95, 0.85, 0.25, 1)
 [node name="World" type="Node3D"]
 script = ExtResource("1_level")
 level_type = "world"
+enemy_spawns = Array[Vector3]([Vector3(0, 1, -9.5), Vector3(-12, 1, -8), Vector3(14, 1, 2)])
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Env_1")
@@ -94,6 +95,11 @@ shape = SubResource("Shape_box")
 
 [node name="Spawner" type="MultiplayerSpawner" parent="."]
 spawn_path = NodePath("../Players")
+
+[node name="Enemies" type="Node3D" parent="."]
+
+[node name="EnemySpawner" type="MultiplayerSpawner" parent="."]
+spawn_path = NodePath("../Enemies")
 
 [node name="Trigger" type="Area3D" parent="."]
 collision_mask = 2

@@ -19,6 +19,13 @@ theme = ExtResource("2_theme")
 [node name="VBox" type="VBoxContainer" parent="Panel"]
 theme_override_constants/separation = 3
 
+[node name="HealthLabel" type="Label" parent="Panel/VBox"]
+text = "100 / 100 HP"
+
+[node name="HPBar" type="ProgressBar" parent="Panel/VBox"]
+custom_minimum_size = Vector2(248, 8)
+show_percentage = false
+
 [node name="LevelLabel" type="Label" parent="Panel/VBox"]
 text = "Level 1"
 

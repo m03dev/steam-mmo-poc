@@ -1,0 +1,66 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="1_enemy"]
+[ext_resource type="Script" path="res://scripts/health.gd" id="2_health"]
+
+[sub_resource type="CapsuleShape3D" id="Shape_body"]
+radius = 0.5
+height = 2.0
+
+[sub_resource type="CapsuleMesh" id="Mesh_body"]
+radius = 0.5
+height = 2.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.36, 0.34, 0.33, 1)
+roughness = 0.9
+
+[sub_resource type="QuadMesh" id="Mesh_bar"]
+size = Vector2(1.6, 0.16)
+
+[sub_resource type="SceneReplicationConfig" id="Replication"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/replication_mode = 1
+properties/2/path = NodePath("Health:current")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+
+[node name="Enemy" type="CharacterBody3D"]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_enemy")
+display_name = "Forest Wolf"
+max_health = 60
+damage = 9
+xp_reward = 40
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("Mesh_body")
+surface_material_override/0 = SubResource("Mat_body")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+shape = SubResource("Shape_body")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+maximum = 60
+current = 60
+
+[node name="Synchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("Replication")
+
+[node name="Nameplate" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, 0)
+billboard = 1
+no_depth_test = true
+font_size = 40
+outline_size = 10
+pixel_size = 0.004
+text = "Forest Wolf"
+
+[node name="HealthBar" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)
+mesh = SubResource("Mesh_bar")

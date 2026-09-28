@@ -11,8 +11,18 @@ extends Node3D
 ## Where players appear in this level. Spread out per peer so two boxes never
 ## spawn inside each other (which makes physics fling them apart).
 @export var spawn_point: Vector3 = Vector3(0.0, 1.0, 0.0)
+## Where the mobs of this level stand.
+##
+## An array of positions rather than a authored node per mob, because the server
+## spawns and respawns them BY INDEX: the index is the whole spawn payload, so
+## every peer rebuilds the same mob in the same place from one integer and no
+## extra traffic. Empty means "no enemies here" -- which is what the dungeon says.
+@export var enemy_spawns: Array[Vector3] = []
+## How long a killed mob stays gone.
+@export var enemy_respawn_delay: float = 8.0
 
 const PLAYER_SCENE: PackedScene = preload("res://scenes/Player.tscn")
+const ENEMY_SCENE: PackedScene = preload("res://scenes/Enemy.tscn")
 
 var _transitioning: bool = false
 ## Client-only overview camera shown until the host spawns our own box.
@@ -21,11 +31,18 @@ var _fallback_cam: Camera3D = null
 @onready var spawner: MultiplayerSpawner = $Spawner
 @onready var players: Node3D = $Players
 @onready var trigger: Area3D = $Trigger
+@onready var enemy_spawner: MultiplayerSpawner = get_node_or_null("EnemySpawner") as MultiplayerSpawner
+@onready var enemies: Node3D = get_node_or_null("Enemies") as Node3D
 
 
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	trigger.body_entered.connect(_on_trigger_entered)
+	# A level announces itself, so anything that needs to know where players appear
+	# can find it by group rather than by guessing at node paths.
+	add_to_group(WorldState.KIND_LEVEL)
+	# Every peer needs the spawn function fitted, including clients that have not
+	# received a mob yet: a MultiplayerSpawner rebuilds incoming spawns with it.
 	# NOTE: Godot's default multiplayer_peer is an OfflineMultiplayerPeer, NOT
 	# null. Testing `== null` alone would make every peer think it is the server,
 	# so "are we actually connected to anyone?" must name that class explicitly.
@@ -34,9 +51,13 @@ func _ready() -> void:
 	print("[Level/%s] ready | offline=%s server=%s my_id=%d" % [
 			level_type, str(offline), str(multiplayer.is_server()), multiplayer.get_unique_id()])
 
+	if enemy_spawner != null:
+		enemy_spawner.spawn_function = _spawn_enemy_node
+
 	# Offline / editor: no real connection, so just spawn a local player.
 	if offline:
 		_spawn_local()
+		_spawn_all_enemies()
 		return
 
 	if multiplayer.is_server():
@@ -46,6 +67,7 @@ func _ready() -> void:
 		_spawn(multiplayer.get_unique_id())
 		for id in multiplayer.get_peers():
 			_spawn(id)
+		_spawn_all_enemies()
 	else:
 		# Client: the host spawns our box and replicates it. Until that arrives
 		# we would be staring at a black screen, so watch from a fixed overview
@@ -61,6 +83,54 @@ func _spawn_player(data: Variant) -> Node:
 	player.position = spawn_point + spawn_offset_for(id)
 	_label_player(player, id)
 	return player
+
+
+#region Mobs --------------------------------------------------------------------
+
+## Spawn every mob this level declares. Server and offline only -- a client's copy
+## of this scene receives them from the host instead, which is also how a peer that
+## joins later gets the mobs that are already standing there.
+func _spawn_all_enemies() -> void:
+	if enemy_spawner == null or enemies == null:
+		return
+	for index in enemy_spawns.size():
+		enemy_spawner.spawn(index)
+
+
+## Builds a mob from nothing but its spawn index. Runs on every peer (the spawner
+## calls it here and on each client as the spawn arrives), so the name and the
+## position have to be derivable from the index alone -- no per-peer reasoning.
+func _spawn_enemy_node(data: Variant) -> Node:
+	var index: int = int(data)
+	var enemy: Enemy = ENEMY_SCENE.instantiate()
+	enemy.name = "enemy_%d" % index
+	enemy.spawn_id = index
+	if index >= 0 and index < enemy_spawns.size():
+		enemy.position = enemy_spawns[index]
+	else:
+		enemy.position = spawn_point
+	return enemy
+
+
+## Called by a fallen mob. The level owns the clock here on purpose: the spawn point
+## belongs to the content, so the respawn delay does too -- and WorldState provides
+## the timer, so no node has to run a countdown of its own.
+##
+## Nothing is despawned and nothing is re-spawned: the mob is still standing there
+## with zero hit points, which every peer can see for itself because health is
+## replicated. Restoring it is therefore all a revival takes.
+func respawn_enemy(enemy: Node) -> void:
+	if enemy == null:
+		return
+	WorldState.schedule(_revive_enemy_now.bind(enemy), enemy_respawn_delay)
+
+
+func _revive_enemy_now(enemy: Node) -> void:
+	# Bound a node into a timer, so it may have been freed in the meantime.
+	if is_instance_valid(enemy) and enemy.has_method("revive"):
+		enemy.revive()
+
+#endregion
 
 
 ## Deterministic per-peer offset: every peer derives the same spot from the id
