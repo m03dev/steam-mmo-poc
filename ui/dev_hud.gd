@@ -62,13 +62,15 @@ func _show_frame_timing() -> void:
 
 
 func _show_network() -> void:
-	var role: String = "offline"
-	if NetworkManager.current_lobby_id != 0:
-		role = "host" if NetworkManager.is_host else "client"
-	_net_value.text = "%s   peer %d%s" % [role.to_upper(), multiplayer.get_unique_id(), _steam_suffix()]
+	_net_value.text = "%s   peer %d%s" % [
+			_session_role().to_upper(), multiplayer.get_unique_id(), _steam_suffix()]
 
 	if NetworkManager.current_lobby_id == 0:
-		_lobby_value.text = "no lobby"
+		# A direct-IP session has no lobby by design, so the lobby check alone cannot
+		# tell it from a genuinely offline game: without the transport test below,
+		# a live peer-to-peer session reported itself as "offline".
+		_lobby_value.text = ("direct ip   port %d" % NetworkManager.direct_port
+				if NetworkManager.is_direct_session() else "no lobby")
 		%InviteButton.disabled = true
 		return
 	%InviteButton.disabled = not SteamManager.is_initialized
@@ -77,6 +79,22 @@ func _show_network() -> void:
 			NetworkManager.current_lobby_id,
 			NetworkManager.get_player_count(),
 			NetworkManager.MAX_MEMBERS]
+
+
+## Who we are in this session, for the NET row. A direct-IP session never gets a
+## Steam lobby id, so it must be identified by the transport rather than the lobby.
+func _session_role() -> String:
+	return session_role(NetworkManager.current_lobby_id,
+			NetworkManager.is_direct_session(), NetworkManager.is_host)
+
+
+## The mapping above, kept pure so a unit test can pin it without a display or a
+## live peer. "offline" is reserved for a game with no session at all.
+static func session_role(lobby_id: int, is_direct: bool, is_host: bool) -> String:
+	if lobby_id == 0 and not is_direct:
+		return "offline"
+	var role: String = "host" if is_host else "client"
+	return "%s (direct)" % role if is_direct else role
 
 
 ## Our own Steam account, so a screenshot of this panel identifies the peer.
@@ -134,10 +152,19 @@ func _show_peers() -> void:
 
 
 ## "<peer id> <name> <ping> [steam <ping>] [q <quality>]" -- only the parts we
-## actually have. The peer id leads because that is the id replication uses.
+## actually have. The peer id leads because that is the id replication uses, unless
+## the name already IS the id ("player_<id>", which is what a peer with no Steam
+## identity is called): printing both would say the same number twice.
 func _peer_line(row: Dictionary) -> String:
-	var parts: PackedStringArray = PackedStringArray([
-			str(int(row["peer_id"])), str(row["name"]), _format_ms(int(row["ping"]))])
+	var peer_id: int = int(row["peer_id"])
+	var peer_name: String = str(row["name"])
+	var parts: PackedStringArray = PackedStringArray()
+	if peer_name == "player_%d" % peer_id:
+		parts.append(peer_name)
+	else:
+		parts.append(str(peer_id))
+		parts.append(peer_name)
+	parts.append(_format_ms(int(row["ping"])))
 	var steam_ping: int = int(row["steam_ping"])
 	if steam_ping >= 0:
 		parts.append("steam %d ms" % steam_ping)

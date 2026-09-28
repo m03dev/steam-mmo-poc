@@ -159,3 +159,24 @@ func test_leaving_closes_a_direct_session_completely() -> void:
 
 
 #endregion
+
+#region What the dev HUD calls this session --------------------------------------
+
+## ui/dev_hud.gd used to label ANY session without a Steam lobby id as "offline",
+## which a direct-IP game never has -- so two peers could be playing and the panel
+## would say nobody was. The mapping is pure so it can be pinned here.
+func test_a_direct_session_is_never_reported_as_offline() -> void:
+	var hud: GDScript = load("res://ui/dev_hud.gd")
+	assert_eq(hud.session_role(0, false, false), "offline",
+		"no lobby and no direct session really is offline")
+	assert_eq(hud.session_role(0, true, true), "host (direct)",
+		"a direct host has no lobby, and is not offline")
+	assert_eq(hud.session_role(0, true, false), "client (direct)",
+		"nor is a direct client")
+	assert_eq(hud.session_role(12345, false, true), "host",
+		"a Steam lobby keeps its plain label")
+	assert_eq(hud.session_role(12345, false, false), "client",
+		"and so does a Steam client")
+
+
+#endregion

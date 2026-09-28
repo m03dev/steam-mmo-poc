@@ -237,11 +237,15 @@ func _steam_id_for(peer_id: int) -> int:
 
 
 ## Best-effort display name: what the peer published in the lobby, else Steam's
-## own name for that account, else nothing usable.
+## own name for that account, else the name replication knows them by,
+## "player_<peer id>". That last fallback matters for the direct-IP transport, where
+## this peer has no Steam identity at all: the hud used to print a bare "?" there,
+## which tells the reader less than the id it is already keyed on (and less than the
+## name tag over that player's head).
 func _name_for(peer_id: int) -> String:
 	var steam_id: int = _steam_id_for(peer_id)
 	if steam_id == 0 or not SteamManager.is_initialized:
-		return "?"
+		return "player_%d" % peer_id
 	if NetworkManager.current_lobby_id != 0:
 		var published: String = Steam.getLobbyMemberData(
 				NetworkManager.current_lobby_id, steam_id, "name")

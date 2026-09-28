@@ -60,43 +60,45 @@ format. (Protocol stays 3.)
 the Steam build. Browser build is a single-player preview." Never quietly ship a build that
 silently cannot find other players — the friends-only lobby trap already taught that lesson.
 
-## What Mohamed has to do (about two minutes, and only he can)
+## What Mohamed has to do now -- two minutes, and only he can
 
-I cannot register accounts for him — an account is a legal agreement in his name, tied to
-his email and password, and me holding those credentials would be strictly worse for him.
-So, the shortest possible version:
+Good news first: **the page already exists.** Pollux created it and pushed both channels from
+Windows; it is **`mo3dev/testing`** -- <https://mo3dev.itch.io/testing>. Two things are left:
 
-1. Go to **https://itch.io/register** — pick a username, email, password. Confirm the email.
-2. Open **https://itch.io/game/new** and fill in a title (suggested: *Steam MMO POC*),
-   and the **URL slug** (suggested: `steam-mmo-poc`). Save it. It does not have to be good
-   yet; it can be edited forever, and it can stay hidden until we want it seen.
-3. Decide visibility: **Draft / Restricted** while testing, **Public** when ready.
+1. **Make the page visible.** It is currently a **private draft**, so that URL 404s for
+   everyone else. On itch: the project -> *Edit* -> **Visibility** -> *Public* (or *Restricted*
+   while testing).
+2. **Authenticate butler on THIS machine.** Credentials do not travel between machines:
+   Pollux's pushes came from his Windows box and this Mac has never logged in. One command, run
+   by him:
 
-That is the whole account half. He does **not** need to know anything about uploading.
+       ~/Applications/butler/butler login
 
-**The push itself is ready to go: `tools/itch_push.sh <user> <slug>`** (dry-run works
-without any credentials, and it verifies the build against `VERSIONS.md` before sending).
+   It writes `~/Library/Application Support/itch/butler_creds` -- butler's **macOS** default,
+   which is *not* `~/.config/itch/` (the Linux path). `tools/itch_push.sh` checks both, and that
+   matters: its first version knew only the Linux path, so it would have refused a perfectly
+   valid push on this machine. For a one-off instead: an API key from itch -> *Settings* ->
+   **API keys**, exported as `BUTLER_API_KEY` and revoked afterwards. I never hold either
+   credential.
 
-### Then, to let me upload builds (one of two options)
+I cannot register accounts for him -- an account is an agreement in his name, tied to his email
+and password, and me holding those would be strictly worse for him. That half is done; the two
+items above are what is left.
 
-**`butler` is already installed** — `~/Applications/butler/butler`, v15.31.0. Not on `PATH`;
-call it by that path, or add `~/Applications/butler` to `PATH`. Note the download host:
-`broth.itch.ovh` **does not resolve** from this machine, use **`broth.itch.zone`**
-(`https://broth.itch.zone/butler/darwin-amd64/LATEST/archive/default`, a redirect). There is
-no Homebrew here.
+### Why the live builds still need replacing
 
-So the only thing still missing is **auth**, one of:
+Both channels hold **Pollux's builds from `src_b81ca5c`**, labelled `0.1.0` (windows) and
+`0.1.2` (osx). They predate the direct-IP transport and this week's fixes. Windows is confirmed
+working by Mohamed; the osx channel now serves a zip that unzips to a runnable app. Pushing
+`0.0011` from this machine replaces both.
 
-**Option A — preferred, and Mohamed never hands over a key.** He runs this once, himself:
+### Version labels, so the page does not look like a downgrade
 
-    ~/Applications/butler/butler login
-
-It stores a credential in `~/.config/itch/butler_creds` (currently absent) and buttons this
-machine to his account. I then push builds without ever holding a key.
-
-**Option B** — he creates an API key in itch's settings and passes it to me; butler reads it
-from `BUTLER_API_KEY` for a single push. Faster, worse hygiene: the key is account-wide and
-should be revoked afterwards.
+itch shows each build's version string, and Pollux labelled his `0.1.x` while the repo's single
+source of truth (`VERSION`) says **0.0011**. Pushing under `0.0011` reads as a rollback, so say
+it once in the page text: version strings now follow the repo, because a version matching the
+code is the one that stops "which build is this?" confusion. From the next release on the two
+move together.
 
 ## What I do once the page exists
 
@@ -116,8 +118,16 @@ What that script does, in the order that matters:
   in a browser (see the browser section below), and a broken page is worse than no page.
   `--html5` exists, but it runs `tools/web_smoke.sh` first and **aborts** if the browser
   build fails — the flag cannot be used to ship the known-bad build by accident.
-- Refuses to run at all without `~/.config/itch/butler_creds`, and prints the one command
-  Mohamed has to run himself.
+- **Pushes every zip as a blob from its own staging directory (`--no-auto-unzip`).** This is
+  not tidiness. butler's default is to *unpack* a lone zip found in the source directory, and on
+  the `osx` channel that strips the `.app`'s executable bit -- which is exactly why Pollux's
+  first macOS push produced a download that would not open on a Mac. He found it, fixed it with
+  this flag, and proved the fix by fetching the deployed build back and comparing sha256. Pushing
+  the blob keeps the delivered artefact byte-identical to the file `VERSIONS.md` records, so the
+  ledger means something from disk to downloader. Verified here on butler v15.31.0: without the
+  flag the dry run lists the loose `SteamMMO.app/...` tree; with it, "1 files, 63.36 MiB".
+- Refuses to run without butler auth, checking **both** identity paths (macOS and Linux), and
+  prints the one command Mohamed has to run himself.
 - Reminds you of the page text that stops testers reporting a good build as broken (the
   unsigned-macOS/Gatekeeper note), and that the same push is the update mechanism.
 
@@ -212,26 +222,18 @@ Result: `index.html` / `.js` / `.wasm` / `.pck`, ~45 MB, threads **off** so it n
 special headers from itch. Templates are installed and `export_presets.cfg [preset.2]` holds
 the config; see `AGENTS.md` section 9 for the details and the traps.
 
-## Page copy (draft, for review — a first sketch, not final)
+## Page copy
 
-    Title:    Steam MMO POC
-    Tagline:  A seamless-world MMO prototype: shared world, a dungeon, quests and combat.
-    Tags:     multiplayer, mmo, prototyped, godot, low-poly
+The paste-ready store text lives in **`ITCH_PAGE.md`** -- title, tagline, description, system
+requirements, screenshot guidance. It is deliberately kept accurate to the shipped build: the
+first draft (Pollux's, `patches/itch-page-copy.md`) named a direct-IP port of **24565** and
+buttons called "Host by IP" / "Join by IP". The build's port is **23460** and the buttons are
+**`Host Direct (IP, no Steam)`** / **`Join Direct`**. A store page that teaches the wrong button
+name is worse than a vague one -- change `ITCH_PAGE.md` in the same commit as the UI.
 
-    A proof of concept for a WoW-style seamless world, built in Godot 4 over Steam's
-    peer-to-peer relay: walk out of a shared open world into a private dungeon and back
-    without a loading screen; kill wolves, loot pelts, finish a quest, chat with whoever
-    else is online.
-
-    This is a prototype, not a game: the world is blockout geometry, there is no art
-    pass, and things will break. In the windows/macos download you can host over your
-    own IP and have a friend join (same network: just the address; across the internet:
-    port 23460 forwarded), or play the Steam build. The browser build below is a
-    single-player preview -- a browser cannot open the kind of socket this game uses.
-
-Screenshots: take them with `run_scene` (the game's own camera is nicer than a mockup) —
-world with a wolf, a dungeon, the quest tracker as it ticks up, the chat box with a real
-line. itch shows the first four on the page, so the first one should be the wide world shot.
+Screenshots, in the order the page shows them: the start screen (Steam row **and** direct-IP
+row), the open world with a wolf, the dungeon, and the dev HUD with two peers and their pings.
+The game's own camera, never a mockup.
 
 ## Checklist, in order
 
@@ -246,20 +248,31 @@ line. itch shows the first four on the page, so the first one should be the wide
       section above for the console evidence). **NOT shippable as it stands.** Needs a
       decision (options A/B/C above, owner: Mohamed) and then the work (owner: Castor), and
       in either case a `tools/web_smoke.sh` pass before it goes on the page.
-- [x] **2. The account exists** — Mohamed has one. Still needed from him: the **username**
-      and the **page slug**, so a push has a target. (Page: <https://itch.io/game/new>.)
-- [ ] **3. Get `butler` working.** Installed: `~/Applications/butler/butler` v15.31.0 (see the
-      correction about `broth.itch.zone` above). What is still missing is **auth** — either
-      Mohamed runs `butler login` once, or he hands over an API key.
-- [x] **4a. The push is one command away** — `tools/itch_push.sh <user> <slug>` (verified:
-      ledger sha checks pass, `--dry-run` clean, and it refuses both without a login and
-      with `--html5` while the browser build is broken). It still needs step 2 + 3.
-- [ ] **4b. Castor: take the page screenshots** (the push waits on the same two human
-      things, so this can happen after).
-- [ ] **5. Verify the download runs on a machine that has never seen this project** — the
-      only honest test of a distributable. Windows build on Pollux's box is the obvious
-      candidate; he is already on the other side of the channel.
-- [ ] **6. Both: write it into `README.md`** ("Where to get it" table) and `STATUS.md`.
+- [x] **2. The page exists** -- **`mo3dev/testing`**, created and first pushed by Pollux. Still
+      needed from Mohamed: itch -> the project -> Edit -> **Visibility -> Public** (it is a
+      private draft, so the URL 404s).
+- [ ] **3. Authenticate butler on the MAC.** Pollux's credentials live on Windows, so this
+      machine still cannot push. Mohamed: `~/Applications/butler/butler login` once (or
+      `BUTLER_API_KEY` for a single push, revoked after). Watch the identity path -- macOS uses
+      `~/Library/Application Support/itch/butler_creds`.
+- [x] **4a. The push is one command and it cannot lie** -- `tools/itch_push.sh` defaults to
+      `mo3dev/testing`; verifies both zips against the `VERSIONS.md` sha; pushes each as a **zip
+      blob from a staging dir (`--no-auto-unzip`)** so the macOS download keeps its executable
+      bit (the trap Pollux hit, and one this script's *own* first version walked into); refuses
+      without auth, checking both platform paths; refuses `--html5` while the browser build is
+      broken. Dry runs verified for both channels.
+- [ ] **4b. Castor: push 0.0011 to replace the stale live builds** as soon as the Mac is
+      authenticated, then confirm what is actually served (`butler fetch` + sha256).
+- [x] **4c. Castor: page screenshots taken** -- `01_start_screen`, `02_open_world` (the cover),
+      `03_dungeon`, `04_two_peers` in `dist/screenshots/` and the Drive `itch-assets/` folder.
+      `tools/shot.sh` takes them from the real game; see `ITCH_PAGE.md` for what each shows and
+      the exact commands.
+
+**The macOS zip is verified the way a downloader receives it**, not just built: unzipped into
+`/tmp`, the bundle carries `rwxr-xr-x` on `SteamMMO.app/Contents/MacOS/SteamMMO` inside the zip
+(`unzip -Z` confirms it), and the extracted app boots -- `SteamMMO v0.0011`, protocol 3, Steam
+API OK, exit 0. Pushed as a blob it therefore arrives runnable; pushed through butler's default
+auto-unzip it would not.
 - [ ] **7. Only then** consider Steam, which needs the App ID (`STEAM_RELEASE.md`).
 
 Steps 1 and 2 are independent and can happen in either order — but do **not** put the page

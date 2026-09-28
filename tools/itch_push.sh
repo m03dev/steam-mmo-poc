@@ -2,68 +2,100 @@
 #
 # itch_push.sh -- put the downloadable builds on itch.io, and nothing that is broken.
 #
-#   tools/itch_push.sh <itch-user> <page-slug> [--dry-run] [--html5]
+#   tools/itch_push.sh [itch-user] [page-slug] [--only windows|osx] [--dry-run] [--html5]
 #
-# One command, because the only things missing were always the human's: the page slug
-# and `butler login`. Neither is a secret this script needs to hold -- butler reads
-# ~/.config/itch/butler_creds, which Mohamed creates by running, once, himself:
+# Defaults to the real page: mo3dev/testing. The only things it needs that are not
+# here are the human's: the page must exist, and this machine must be authenticated
+# with butler (see AUTH below).
 #
-#     ~/Applications/butler/butler login
+# ============================================================================
+# THE AUTO-UNZIP TRAP -- read this before changing anything here
+# ============================================================================
+# Pushing a .zip as `src` is NOT the same as pushing a directory that happens to
+# contain one .zip, and the difference is invisible until someone on a Mac tries to
+# open the result. Observed on butler v15.31.0:
 #
-# WHAT IT PUSHES, and why exactly this much:
-#   windows  dist/SteamMMO_<version>.zip          (44 MB)
-#   osx      dist/SteamMMO_<version>_macos.zip    (66 MB)  <- _macos, not _mac
+#   butler push --dry-run /tmp/stage_probe mo3dev/testing:osx
+#     * (/tmp/stage_probe) contains a single .zip file, treating X.zip as the container
+#     drwxr-xr-x  SteamMMO.app/Contents/MacOS/           <- pushes the LOOSE TREE
+#     -rwxr-xr-x  SteamMMO.app/Contents/MacOS/SteamMMO
 #
-# It does NOT push the html5 channel by default. That build renders its menu and is
-# completely inert -- three Steam-coupled autoloads fail to PARSE in a browser, so
-# every button does nothing (see ITCH.md). A broken page is worse than no page.
-# `--html5` will push it, but only after tools/web_smoke.sh passes, so the flag
-# cannot be used to ship the known-bad build by accident.
+#   butler push --no-auto-unzip --dry-run /tmp/stage_probe mo3dev/testing:osx
+#     -rw-r--r--  63.36 MiB SteamMMO_0.0011_macos.zip     <- pushes the ZIP AS A BLOB
+#     Would push 63.36 MiB (1 files, 0 dirs, 0 symlinks)
+#
+# Auto-unzip is the DEFAULT for a directory holding exactly one zip. This is how
+# Pollux's first osx push shipped a .app that would not open on the Mac: the
+# delivered bundle had lost its executable bit. It is harmless on Windows (no unix
+# modes to lose) but it breaks the osx download, so this script ALWAYS pushes from a
+# one-zip staging directory with --no-auto-unzip. That also makes the delivered
+# artefact byte-identical to the file whose sha256 is recorded in VERSIONS.md, so the
+# ledger means something end to end.
+#
+# Do not "simplify" this back to `butler push dist/X.zip` -- given a .zip as src,
+# butler is free to unpack it too.
+# ============================================================================
+#
+# NOT pushed: the html5 channel. That build renders its menu and every button is
+# dead -- three Steam-coupled autoloads fail to PARSE in a browser, so no runtime
+# guard can help (see ITCH.md). --html5 exists but runs tools/web_smoke.sh first and
+# aborts while the build fails, so the flag cannot ship the known-bad build by accident.
 set -uo pipefail
 
 BUTLER="${BUTLER:-$HOME/Applications/butler/butler}"
+ITCH_USER="${ITCH_USER:-mo3dev}"
+SLUG="${ITCH_SLUG:-testing}"
 DRY_RUN=0
 WITH_HTML5=0
+ONLY=""
+_next_only=0
 ARGS=()
 for a in "$@"; do
+	if [ "$_next_only" -eq 1 ]; then ONLY="$a"; _next_only=0; continue; fi
 	case "$a" in
 		--dry-run) DRY_RUN=1 ;;
 		--html5) WITH_HTML5=1 ;;
-		-h|--help) sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		--only) _next_only=1 ;;
+		--only=*) ONLY="${a#--only=}" ;;
+		windows|osx) ARGS+=("$a") ;;
+		-h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		-*) echo "unknown option: $a" >&2; exit 2 ;;
 		*) ARGS+=("$a") ;;
 	esac
 done
-[ "${#ARGS[@]}" -eq 2 ] || {
-	echo "usage: tools/itch_push.sh <itch-user> <page-slug> [--dry-run] [--html5]" >&2
+if [ "$_next_only" -eq 1 ]; then echo "--only wants windows or osx" >&2; exit 2; fi
+case "$ONLY" in ""|windows|osx) ;; *) echo "--only wants windows or osx, got '$ONLY'" >&2; exit 2 ;; esac
+
+# Positional args are optional and only there so the page can be retargeted.
+if [ "${#ARGS[@]}" -ge 1 ]; then ITCH_USER="${ARGS[0]}"; fi
+if [ "${#ARGS[@]}" -ge 2 ]; then SLUG="${ARGS[1]}"; fi
+if [ "${#ARGS[@]}" -gt 2 ]; then
+	echo "usage: tools/itch_push.sh [user] [slug] [--only windows|osx] [--dry-run] [--html5]" >&2
 	exit 2
-}
-ITCH_USER="${ARGS[0]}"
-SLUG="${ARGS[1]}"
+fi
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$PROJECT_DIR/dist"
 LEDGER="$PROJECT_DIR/VERSIONS.md"
 VERSION="$(cat "$PROJECT_DIR/VERSION")"
-CREDS="$HOME/.config/itch/butler_creds"
 
 [ -x "$BUTLER" ] || {
 	echo "!! butler not found at $BUTLER" >&2
-	echo "   (it is installed there per ITCH.md; override with BUTLER=/path/to/butler)" >&2
+	echo "   (installed there per ITCH.md; override with BUTLER=/path/to/butler)" >&2
 	exit 1
 }
 
-# Refuse to push an artefact whose bytes are not the ones the ledger recorded: this is
-# the difference between shipping a build and shipping a build someone edited by hand.
+# Refuse to push bytes that are not the ones the ledger recorded: this is the
+# difference between shipping a build and shipping a build someone edited by hand.
 expect() { # file, version, label
 	local file="$1" ver="$2" label="$3"
 	local expected actual
 	expected="$(grep -F "SteamMMO_$ver" "$LEDGER" | grep -F "($label)" \
 		| grep -oE 'sha256 `[0-9a-f]{64}`' | tail -1 | tr -d '`' | awk '{print $2}')"
-	[ -n "$expected" ] || {
+	if [ -z "$expected" ]; then
 		echo "!! no $label entry for $ver in VERSIONS.md -- cut a release first" >&2
 		return 1
-	}
+	fi
 	actual="$(shasum -a 256 "$file" | cut -d' ' -f1)"
 	if [ "$expected" != "$actual" ]; then
 		echo "!! $file does not match VERSIONS.md" >&2
@@ -71,18 +103,72 @@ expect() { # file, version, label
 		echo "   disk:   $actual" >&2
 		return 1
 	fi
-	echo "==> $label artefact verified against the ledger"
+	echo "==> $label artefact verified against the ledger (sha256 $actual)"
 }
 
-WIN_ZIP="$DIST_DIR/SteamMMO_$VERSION.zip"
-MAC_ZIP="$DIST_DIR/SteamMMO_${VERSION}_macos.zip"
-[ -f "$WIN_ZIP" ] || { echo "!! missing $WIN_ZIP" >&2; exit 1; }
-[ -f "$MAC_ZIP" ] || { echo "!! missing $MAC_ZIP" >&2; exit 1; }
+# ---------------------------------------------------------------------------
+# AUTH. butler's default identity file differs per platform -- on macOS it is
+# ~/Library/Application Support/itch/butler_creds, and this script used to look only
+# at the Linux path, which would have refused a perfectly valid push. Look at both.
+# ---------------------------------------------------------------------------
+identities=(
+	"$HOME/Library/Application Support/itch/butler_creds"
+	"$HOME/.config/itch/butler_creds"
+)
+authed=0
+for i in "${identities[@]}"; do if [ -f "$i" ]; then authed=1; fi; done
+if [ -n "${BUTLER_API_KEY:-}" ]; then authed=1; fi
+
+if [ "$DRY_RUN" -eq 0 ] && [ "$authed" -eq 0 ]; then
+	echo "!! butler is not authenticated on this machine. Looked for:" >&2
+	for i in "${identities[@]}"; do echo "     $i" >&2; done
+	echo "   Run this once, yourself -- it is your account, and the credential stays yours:" >&2
+	echo "       $BUTLER login" >&2
+	echo "   (or set BUTLER_API_KEY from itch.io -> Settings -> API keys for one push, then revoke it)" >&2
+	exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Push one zip as a blob, from its own staging directory. See THE AUTO-UNZIP TRAP.
+# ---------------------------------------------------------------------------
+stage=""
+cleanup() { if [ -n "$stage" ]; then rm -rf "$stage"; fi; }
+trap cleanup EXIT
+stage="$(mktemp -d "${TMPDIR:-/tmp}/itch_stage.XXXXXX")"
+
+push_zip() { # zip-file, channel, what
+	local zip="$1" channel="$2" what="$3" d
+	d="$(mktemp -d "$stage/$channel.XXXX")"
+	cp "$zip" "$d/"
+	# One zip in the directory + --no-auto-unzip == the zip IS the artefact.
+	echo "==> $what -> $ITCH_USER/$SLUG:$channel  (userversion $VERSION, zip as a blob)"
+	if [ "$DRY_RUN" -eq 1 ]; then
+		"$BUTLER" push --no-auto-unzip --dry-run "$d" "$ITCH_USER/$SLUG:$channel" \
+			--userversion "$VERSION" 2>&1 | sed 's/^/    /'
+		local rc=${PIPESTATUS[0]}
+		if [ "$rc" -ne 0 ]; then echo "!! dry run for $channel failed (exit $rc)" >&2; return "$rc"; fi
+	else
+		"$BUTLER" push --no-auto-unzip "$d" "$ITCH_USER/$SLUG:$channel" --userversion "$VERSION"
+	fi
+}
 
 ok=1
-expect "$WIN_ZIP" "$VERSION" "Windows" || ok=0
-expect "$MAC_ZIP" "$VERSION" "macOS" || ok=0
-[ "$ok" -eq 1 ] || exit 1
+want_windows=1
+want_osx=1
+if [ "$ONLY" = "windows" ]; then want_osx=0; fi
+if [ "$ONLY" = "osx" ]; then want_windows=0; fi
+
+if [ "$want_windows" -eq 1 ]; then
+	WIN_ZIP="$DIST_DIR/SteamMMO_$VERSION.zip"
+	if [ ! -f "$WIN_ZIP" ]; then echo "!! missing $WIN_ZIP" >&2; exit 1; fi
+	expect "$WIN_ZIP" "$VERSION" "Windows" || ok=0
+fi
+if [ "$want_osx" -eq 1 ]; then
+	MAC_ZIP="$DIST_DIR/SteamMMO_${VERSION}_macos.zip"
+	if [ ! -f "$MAC_ZIP" ]; then echo "!! missing $MAC_ZIP" >&2; exit 1; fi
+	expect "$MAC_ZIP" "$VERSION" "macOS" || ok=0
+fi
+if [ "$ok" -eq 0 ]; then exit 1; fi
 
 HTML5_DIR="$PROJECT_DIR/build/web"
 if [ "$WITH_HTML5" -eq 1 ]; then
@@ -92,42 +178,38 @@ if [ "$WITH_HTML5" -eq 1 ]; then
 		echo "   That is the point: the menu renders but every button is dead (see ITCH.md)." >&2
 		exit 1
 	fi
-	[ -f "$HTML5_DIR/index.html" ] || { echo "!! no $HTML5_DIR/index.html" >&2; exit 1; }
+	if [ ! -f "$HTML5_DIR/index.html" ]; then echo "!! no $HTML5_DIR/index.html" >&2; exit 1; fi
 fi
 
-if [ "$DRY_RUN" -eq 0 ] && [ ! -f "$CREDS" ]; then
-	echo "!! butler is not logged in ($CREDS is absent)." >&2
-	echo "   Run this once, yourself -- it is your account, and the credential must stay yours:" >&2
-	echo "       $BUTLER login" >&2
-	exit 1
-fi
+if [ "$want_windows" -eq 1 ]; then push_zip "$WIN_ZIP" "windows" "the Windows build" || ok=0; fi
+if [ "$want_osx" -eq 1 ]; then push_zip "$MAC_ZIP" "osx" "the macOS build" || ok=0; fi
 
-push() { # local-path, target, what
-	echo "==> butler push $3 -> $ITCH_USER/$SLUG:$2  (userversion $VERSION)"
-	if [ "$DRY_RUN" -eq 1 ]; then
-		echo "    (dry run: not sent)"
-		return 0
-	fi
-	"$BUTLER" push "$1" "$ITCH_USER/$SLUG:$2" --userversion "$VERSION"
-}
-
-push "$WIN_ZIP" "windows" "the Windows zip"
-push "$MAC_ZIP" "osx" "the macOS zip"
 if [ "$WITH_HTML5" -eq 1 ]; then
-	push "$HTML5_DIR" "html5" "the web folder"
+	echo "==> the web folder -> $ITCH_USER/$SLUG:html5"
+	if [ "$DRY_RUN" -eq 1 ]; then
+		"$BUTLER" push --dry-run "$HTML5_DIR" "$ITCH_USER/$SLUG:html5" --userversion "$VERSION" 2>&1 | sed 's/^/    /'
+	else
+		"$BUTLER" push "$HTML5_DIR" "$ITCH_USER/$SLUG:html5" --userversion "$VERSION"
+	fi
 else
 	echo "==> html5 intentionally NOT pushed: that build's menu is dead in a browser"
 fi
 
+if [ "$ok" -eq 0 ]; then echo "!! at least one push failed" >&2; exit 1; fi
+
 cat <<REMINDERS
 
-==> Remember on the page itself, or the downloads get reported as broken:
-    * macOS is UNSIGNED: testers will see "cannot be opened because the developer cannot
-      be verified" or "it is damaged". Right-click -> Open once, or
-      xattr -dr com.apple.quarantine SteamMMO.app. Say so in the page text.
-    * Multiplayer: the downloads can host/join over IP (LAN works as-is; the open internet
-      needs port 23460 forwarded), or over Steam. The browser build, if ever pushed, is
-      single-player only -- a browser cannot open a UDP socket.
-    * This same push is the update mechanism: friends get "new version available" in the
-      itch app whenever a new VERSION goes up.
+==> After a real push, confirm what the page actually SERVES (not what we sent):
+	  $BUTLER fetch $ITCH_USER/$SLUG:osx --dest /tmp/itch_fetched
+      shasum -a 256 /tmp/itch_fetched/*.zip     # must equal the VERSIONS.md sha
+      unzip -l /tmp/itch_fetched/*.zip | head   # the .app must still be inside
+
+==> Reminders for the page text, or the downloads get reported as broken:
+    * macOS is UNSIGNED: right-click -> Open once, or
+      xattr -dr com.apple.quarantine SteamMMO.app. Say so on the page.
+    * Multiplayer in the downloads: Steam, or direct IP with no Steam at all
+      (LAN as-is; across the internet the host forwards UDP port 23460).
+      The browser build, if ever pushed, is single-player only by nature.
+    * This same push is the update mechanism: the itch app offers the new version
+      whenever a new VERSION goes up.
 REMINDERS
