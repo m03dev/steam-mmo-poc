@@ -106,6 +106,10 @@ Also `tests/two_peer_harness.tscn` (replication + level swap) and `tests/chat_ha
 
 - **Steam:** `STEAM_RELEASE.md` covers the Steamworks side, the playtest shape, and how an App ID
   gets wired in. Build with `tools/release.sh`, upload with `tools/steampipe.sh`.
+- **Browser:** a **Web** preset exists (`export_presets.cfg [preset.2]`, threads off, so it needs
+  no special server headers) and produces a click-to-play build for itch's HTML5 channel.
+  Single-player only — the Steam API does not exist in a browser. `ITCH.md` has the command and
+  exactly how far its verification got.
 - **itch.io:** playable offline today, but **its multiplayer is Steam-based**, so an itch build
   would be single-player only until either (a) the game has its own Steam App ID, or (b) a
   non-Steam transport exists. The seam for (b) is real and already proven: `NetworkManager` is the

@@ -86,14 +86,47 @@ butler push dist/SteamMMO_<version>_mac.zip  <user>/steam-mmo-poc:osx
   that motivated this whole thread.
 - Tag the build before pushing (`butler push --userversion 0.0009`), so the version shown on
   the page matches `VERSION`. Version strings in one place only.
-- The mono editor **cannot** export Web, but the **standard (non-.NET) 4.7 editor is now
-  installed on the Mac at `~/Applications/Godot.app`** and the project has zero C# in it, so a
-  browser build is genuinely on the table (verified: the standard editor opens this project and
-  passes 149/149). It needs the 1.28 GB `Godot_v4.7-stable_export_templates.tpz` installed
-  once. See `AGENTS.md` section 9.
-- **A web build is single-player only** — the Steam API cannot run in a browser. That is still
-  the best "click a link and be playing in ten seconds" artefact itch can host, so it is worth
-  having *alongside* the downloadable build, not instead of it.
+## The browser build: built, and one step short of proven
+
+The best artefact itch can host is a **click-and-play browser build** — no download, no
+install, no Steam account. That is now produced:
+
+```bash
+cd /Users/mohamed/testing-17
+mkdir -p build/web                       # Godot will NOT create this for you
+~/Applications/Godot.app/Contents/MacOS/Godot --headless --path . \
+  --export-release "Web" build/web/index.html
+```
+
+Result: `index.html` / `.js` / `.wasm` / `.pck`, ~45 MB, threads **off** so it needs no
+special headers from itch. Templates are installed and `export_presets.cfg [preset.2]` holds
+the config; see `AGENTS.md` section 9 for the details and the traps.
+
+**Verified:** the export completes; the files are complete and serve over HTTP; and in a real
+browser the build **boots** — a capture of the running page shows Godot's loading splash
+drawn from the exported wasm.
+
+**Not verified, and said out loud:** that the game gets *past* boot to the start screen. Under
+headless Chrome it stops at the splash reproducibly, whichever renderer is forced — a
+software-rendering limit, not a verdict on the build. So the first real test is a human
+opening it once, which takes ten seconds:
+
+```bash
+# serve it, then open the URL in any real browser
+cd /Users/mohamed/testing-17/build/web && python3 -m http.server 8123
+open http://localhost:8123/
+```
+
+Expect: the start screen, then **Play Offline** (there is no Steam in a browser — the code
+handles that by design, `autoload/SteamManager.gd` checks for the Steam singleton first).
+
+Push it to the page once the slug exists:
+
+```bash
+~/Applications/butler/butler push build/web <user>/<slug>:html5 --userversion 0.0009
+```
+
+itch wants the **folder** for an HTML5 game, not a zip, and it must contain `index.html`.
 
 ## Page copy (draft, for review — a first sketch, not final)
 
@@ -118,6 +151,9 @@ line. itch shows the first four on the page, so the first one should be the wide
 
 - [ ] **1. Direct-IP ENet transport** so an itch build can play multiplayer (prerequisite
       for the page saying "multiplayer" at all). — *owner: Castor, not started*
+- [x] **1b. Browser build** — exported, files complete, boots in a browser. **One human
+      check left**: open it once in a real browser and confirm it reaches the start screen
+      and plays offline (see the section above). — *owner: Mohamed, 10 seconds*
 - [x] **2. The account exists** — Mohamed has one. Still needed from him: the **username**
       and the **page slug**, so a push has a target. (Page: <https://itch.io/game/new>.)
 - [ ] **3. Get `butler` working.** Installed: `~/Applications/butler/butler` v15.31.0 (see the

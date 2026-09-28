@@ -190,9 +190,33 @@ is GDScript-only, so .NET buys it nothing.
 browser build is the one itch.io artefact that needs no download, no install and no Steam
 account — the fastest possible way for a friend to actually see the game.
 
-    Templates: Godot_v4.7-stable_export_templates.tpz   (1.28 GB, all platforms)
-    Install:   standard editor -> Editor -> Manage Export Templates -> Install from file
-    Then:      a "Web" preset, export to an HTML5 folder, butler push to the itch page
+    **The web export is set up and produces a build. Status, precisely:**
+
+    Templates: ~/Library/Application Support/Godot/export_templates/4.7.stable  (installed;
+               web_release.zip + web_nothreads_release.zip are present). The mono set stays
+               separate, in 4.7.stable.mono, so the two editors do not fight over it.
+    Preset:    export_presets.cfg [preset.2] = "Web", variant/thread_support=false, so the
+               export uses the *nothreads* templates and needs no COOP/COEP headers from the
+               host - the least fussy web build itch can serve.
+    Export:    mkdir -p build/web && \
+               ~/Applications/Godot.app/Contents/MacOS/Godot --headless --path . \
+                 --export-release "Web" build/web/index.html
+               An EMPTY custom_template/ means "use the installed templates". Godot does NOT
+               create the output folder - it fails with "Target folder does not exist", so
+               mkdir first. Output: index.html/.js/.wasm/.pck, ~45 MB total.
+
+**What is verified, and what is not.** The export completes cleanly, the files are complete
+and serve over HTTP, and in a real browser the build **boots**: `--screenshot` captured
+Godot's own loading splash rendered from the exported wasm. What is **not** verified is the
+game itself reaching the start screen — under headless Chrome the boot stops at that splash
+**reproducibly** (identical frame, 36303 bytes, with or without `--use-angle=metal`, with and
+without swiftshader), which is a limit of software rendering, not evidence about the build.
+**Do not burn an hour on headless Chrome**; open the thing in a real browser instead (see
+`ITCH.md` for the local-serve one-liner). Everything about the browser is otherwise pleasant:
+the code already survives a missing Steam — `autoload/SteamManager.gd` checks
+`Engine.has_singleton("Steam")` first, reports `steam_initialized(false)` and returns, and
+`_process` only pumps callbacks when initialised — which is exactly what a browser is, and
+why the start screen's *Play Offline* is the path that matters there.
 
 Two honest limits, so nobody promises more than this can do:
 
@@ -200,4 +224,4 @@ Two honest limits, so nobody promises more than this can do:
    single-player preview (world, wolves, quest, inventory). Multiplayer stays on the
    downloadable Steam build, and on the direct-IP ENet transport once that exists.
 2. **The .tpz is one monolithic download** for every platform — there is no web-only
-   package. Budget for it once and keep the file.
+   package. It is already installed once, so this is a note, not a task.
