@@ -76,8 +76,14 @@ butler push dist/SteamMMO_<version>_mac.zip  <user>/steam-mmo-poc:osx
   that motivated this whole thread.
 - Tag the build before pushing (`butler push --userversion 0.0009`), so the version shown on
   the page matches `VERSION`. Version strings in one place only.
-- The mono editor **cannot export Web** (no web templates in the mono build), so there is no
-  playable-in-browser build. Downloadable only. Do not promise a web build.
+- The mono editor **cannot** export Web, but the **standard (non-.NET) 4.7 editor is now
+  installed on the Mac at `~/Applications/Godot.app`** and the project has zero C# in it, so a
+  browser build is genuinely on the table (verified: the standard editor opens this project and
+  passes 149/149). It needs the 1.28 GB `Godot_v4.7-stable_export_templates.tpz` installed
+  once. See `AGENTS.md` section 9.
+- **A web build is single-player only** — the Steam API cannot run in a browser. That is still
+  the best "click a link and be playing in ten seconds" artefact itch can host, so it is worth
+  having *alongside* the downloadable build, not instead of it.
 
 ## Page copy (draft, for review — a first sketch, not final)
 
@@ -102,8 +108,12 @@ line. itch shows the first four on the page, so the first one should be the wide
 
 - [ ] **1. Direct-IP ENet transport** so an itch build can play multiplayer (prerequisite
       for the page saying "multiplayer" at all). — *owner: Castor, not started*
-- [ ] **2. Mohamed: create the itch account + page** (2 minutes, see above).
-- [ ] **3. Mohamed: `butler login`** once, or hand over an API key.
+- [x] **2. The account exists** — Mohamed has one. Still needed from him: the **username**
+      and the **page slug**, so a push has a target. (Page: <https://itch.io/game/new>.)
+- [ ] **3. Get `butler` working.** It is installed nowhere yet (checked). `broth.itch.ovh` did
+      **not resolve** from this machine, so the usual one-line download failed — fetch it from
+      itch's docs page instead (<https://itch.io/docs/butler/>). Then either Mohamed runs
+      `butler login` once himself, or he hands over an API key.
 - [ ] **4. Castor: push the first build** and take the screenshots.
 - [ ] **5. Verify the download runs on a machine that has never seen this project** — the
       only honest test of a distributable. Windows build on Pollux's box is the obvious

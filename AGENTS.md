@@ -126,8 +126,13 @@ Read these before debugging something that is not broken:
   with `has_char`.
 - **macOS has no `timeout`** — use `sleep N` + `kill`. A killed process **loses buffered
   stdout**, so a clean exit is the only way to read the last lines.
-- **The mono editor cannot export to Web** (no web templates in the mono build) — an
-  itch.io *web* build is not currently possible; downloadable builds are.
+- **The `[dotnet]` marker in `project.godot` is harmless — this was measured, not assumed.**
+  The tree contains **zero C# files**, yet `project.godot` still carries
+  `[dotnet] project/assembly_name="testing_17"`, left there by the mono editor that created
+  the project. The **standard non-.NET Godot 4.7 editor opens the project with that marker
+  present, with no error**: GodotSteam loads, Steam initializes, and the GUT suite runs
+  **149/149**. Do not "clean up" the marker hoping to fix something, and do not assume a
+  non-.NET editor needs a project change to open this game. Both editors work.
 - `steam_appid.txt` is the App ID source of truth; `tools/release.sh` copies it into the
   build and shouts in red while it is still 480.
 
@@ -168,3 +173,31 @@ Before you write "done":
 
 Claims that were *not* verified are worth more than claims that were, as long as they say
 so. That is how a POC stays honest.
+
+## 9. Editor choice, and the web build it unlocks
+
+**Both Godot editors run this project** — verified above: standard (non-.NET) 4.7-stable
+opens it, initialises Steam and passes **149/149**, exactly like the mono editor. The game
+is GDScript-only, so .NET buys it nothing.
+
+- macOS, mono (what the Ziva-managed editor uses): `/Applications/Godot_mono.app/...`
+- macOS, standard (installed for web export): `~/Applications/Godot.app/...` — same
+  `4.7.stable`, commit `5b4e0cb0f`
+- Use `$S=~/Applications/Godot.app/Contents/MacOS/Godot` only when a step needs the
+  **standard** build; every other command in this file works with either.
+
+**Why anyone cares about the difference:** the mono editor cannot export **Web**, and a
+browser build is the one itch.io artefact that needs no download, no install and no Steam
+account — the fastest possible way for a friend to actually see the game.
+
+    Templates: Godot_v4.7-stable_export_templates.tpz   (1.28 GB, all platforms)
+    Install:   standard editor -> Editor -> Manage Export Templates -> Install from file
+    Then:      a "Web" preset, export to an HTML5 folder, butler push to the itch page
+
+Two honest limits, so nobody promises more than this can do:
+
+1. **A web build cannot do multiplayer.** The Steam API does not exist in a browser. Web =
+   single-player preview (world, wolves, quest, inventory). Multiplayer stays on the
+   downloadable Steam build, and on the direct-IP ENet transport once that exists.
+2. **The .tpz is one monolithic download** for every platform — there is no web-only
+   package. Budget for it once and keep the file.
