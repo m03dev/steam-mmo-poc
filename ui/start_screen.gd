@@ -134,7 +134,18 @@ func _on_steam_initialized(success: bool) -> void:
 		button.disabled = not success
 	_lobby_id_input.editable = success
 	if success:
+		# A lobby Steam named at launch is a command, not an offer: a friend pressed
+		# "Join Game" for us, which is not something to be asked about. Straight in.
+		if NetworkManager.requested_lobby_id != 0:
+			_set_status("Joining a friend (lobby %d)..." % NetworkManager.requested_lobby_id)
+			NetworkManager.join_lobby(NetworkManager.requested_lobby_id)
+			return
 		_set_status("PLAY joins the open world, or opens one if nobody is playing.")
+		if NetworkManager.lobby_visibility == NetworkManager.LobbyVisibility.FRIENDS_ONLY:
+			# On a friends-only app the lobby list cannot see a friend's session, so
+			# say how to get into one instead of letting PLAY quietly open a second.
+			_set_status("PLAY opens a private world. Friends join from the Steam "
+					+ "friends list, or by pasting the lobby id.")
 		_run_launch_action()
 	else:
 		_set_status("Steam is offline - multiplayer disabled. Use Play Offline.")

@@ -43,7 +43,7 @@ const KEY_PROTOCOL: String = "protocol"
 ## It is baked in as a const on purpose: res://VERSION is a loose text file that may
 ## not be packed into an exported build, whereas a const always is. Published in the
 ## lobby and in each member's own data, so both sides can read what they are talking to.
-const GAME_VERSION: String = "0.0008"
+const GAME_VERSION: String = "0.0009"
 
 ## Wire-protocol revision. Bump this when - and only when - the set of @rpc methods
 ## or their signatures changes. Two builds with the same protocol talk to each other
@@ -109,6 +109,14 @@ var lobby_visibility: LobbyVisibility = LobbyVisibility.PUBLIC
 var transport: Transport = Transport.CANONICAL
 var virtual_port: int = DEFAULT_VIRTUAL_PORT
 
+## Which lobby Steam told us to join before we even started.
+##
+## When a player picks "Join Game" in the Steam friends list and the game is not
+## running, Steam LAUNCHES it with a command line ending in
+## `+connect_lobby <id>`. Launching us IS the instruction, so this is not an option
+## to be offered - it is the session to enter, and the menu is a detour around it.
+var requested_lobby_id: int = 0
+
 ## Peer diagnostics. 0 is off; set it with --steam-debug=N and the extension prints
 ## what SteamNetworkingSockets is doing - the only way to see a silently mismatched
 ## socket, since a failed P2P dial reports no error at all.
@@ -130,6 +138,7 @@ func _ready() -> void:
 	print("[NetworkManager] SteamMMO v%s | netcode protocol %d" % [GAME_VERSION, PROTOCOL_VERSION])
 	_parse_transport_args()
 	_resolve_lobby_visibility()
+	_parse_launch_invite()
 	# MultiplayerAPI signal, not the peer's, so this survives every peer swap.
 	multiplayer.peer_connected.connect(_on_multiplayer_peer_connected)
 
@@ -563,6 +572,50 @@ func _parse_transport_args() -> void:
 				virtual_port, steam_debug_level])
 
 
+## Find a lobby Steam asked us to join at launch, if any.
+##
+## Two sources, because the two halves of Steam's launch flow write it differently:
+##   * the command line -- Steam appends `+connect_lobby <id>` when a friend's
+##     "Join Game" starts this process. This is the one that matters.
+##   * a launch option or a pasted launch string -- `+connect <id>`.
+##
+## The command line is searched in BOTH arg lists: `OS.get_cmdline_args()` sees the
+## real process arguments (where Steam's tokens land), and the user args after `--`
+## are searched too so a developer can reproduce the flow by hand:
+##     Godot --path . -- +connect_lobby 123456789
+func _parse_launch_invite() -> void:
+	var all_args: Array[String] = []
+	all_args.append_array(OS.get_cmdline_args())
+	for arg: String in OS.get_cmdline_user_args():
+		all_args.append(arg)
+	requested_lobby_id = _lobby_id_in_args(all_args)
+	if requested_lobby_id != 0:
+		print("[NetworkManager] Steam launched us to join lobby %d." % requested_lobby_id)
+
+
+## The pure half of the search above: given a command line, which lobby does it name?
+## Split out so the parsing can be tested without a process to inspect.
+##
+## Tokens Steam may write. Each may arrive as a flag plus a separate id
+## ("+connect_lobby", "123") or as one string ("+connect_lobby 123"), so take the
+## remainder when there is one and the next argument when there is not.
+func _lobby_id_in_args(args: Array[String]) -> int:
+	for flag: String in ["+connect_lobby", "+connect"]:
+		for i: int in args.size():
+			var arg: String = args[i]
+			if not arg.begins_with(flag):
+				continue
+			var text: String = arg.substr(flag.length()).strip_edges()
+			if text.is_empty() and i + 1 < args.size():
+				text = args[i + 1].strip_edges()
+			# `+connect_lobby 123` is a lobby id; a `+connect` string could carry other
+			# tokens, so take the first positive integer in it and ignore the rest.
+			for token: String in text.split(" ", false):
+				if token.is_valid_int() and int(token) > 0:
+					return int(token)
+	return 0
+
+
 ## The single place a peer is configured, so host and client cannot drift apart.
 func _make_peer() -> SteamMultiplayerPeer:
 	var new_peer: SteamMultiplayerPeer = SteamMultiplayerPeer.new()
@@ -598,6 +651,15 @@ func _on_steam_lobby_match_list(lobbies: Array) -> void:
 		Steam.requestLobbyList()
 		return
 	print("[NetworkManager] No open '%s' lobby -> hosting a new one." % wanted)
+	if lobby_visibility == LobbyVisibility.FRIENDS_ONLY:
+		# Say the quiet part out loud, because this is the failure that looks like a
+		# bug: Steam's lobby list only returns PUBLIC lobbies, so on a friends-only
+		# session this search can never see a friend's world. If a friend IS hosting,
+		# this peer just opened a second, separate one -- and nothing will ever bring
+		# the two together. Invites (or the lobby id) are the way in, by design.
+		push_warning("[NetworkManager] Hosting a friends-only world. Steam's lobby list "
+				+ "cannot see friends-only lobbies, so friends must join by invite "
+				+ "(friends list -> Join Game) or by pasting the lobby id.")
 	create_lobby(wanted)
 
 #endregion

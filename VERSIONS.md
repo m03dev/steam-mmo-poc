@@ -53,3 +53,8 @@ different size, and that is the quickest way to catch it.
 - Integrates Pollux's in-game chat (Chat autoload, chat box HUD, dev harness) and its two fixes: canonical transport is now the default, and NetStats stops probing a disconnected peer. Chat box laid out bottom-centre so it does not sit under the combat log. Protocol 3 (new RPC-bearing autoload).
 - `SteamMMO_0.0008.zip` -- 44177996 bytes -- sha256 `2fb0f031747679dab162b2383b0c5932b622e597935c44b582b5f811645a0a06`
 
+## 0.0009 -- 2026-09-28 08:48
+
+- Pollux's real-game two-peer chat harness (run here: identical transcripts, both peers spawned), Steam launch invites (+connect_lobby is now read, so Join Game from a cold start goes straight in), and a warning when a friends-only session is hosted because Steam's lobby list cannot see friends-only lobbies.
+- `SteamMMO_0.0009.zip` -- 44192532 bytes -- sha256 `5d4eb55c9f84b8ec1b3595b23b77c8760b180c74fff4da21e2597ab870bae826`
+

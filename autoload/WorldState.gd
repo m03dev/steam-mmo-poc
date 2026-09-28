@@ -15,6 +15,14 @@ signal combat_event(text: String)
 
 ## Godot's high-level multiplayer always calls the server peer 1, even offline, so
 ## one constant serves both cases.
+##
+## THIS IS A STEAM-SHAPED FACT, and it is worth knowing why it would change: with
+## Steam we host a real listen server, so the authority genuinely IS peer 1 -- the
+## host owns the socket and every client dials it. On a relay that only switches
+## messages between peers (Ziva's, for instance), peer 1 is a phantom slot with no
+## game running behind it, and authority has to go to the lowest REAL peer id
+## instead. Everything else in this project asks for the server through this
+## constant and `is_server()`, so that swap is the only thing that would move.
 const SERVER_ID: int = 1
 
 const KIND_PLAYER: String = "player"

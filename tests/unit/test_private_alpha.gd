@@ -161,6 +161,67 @@ func test_presence_is_skipped_when_steam_is_down() -> void:
 #endregion
 
 
+#region Launch invites ----------------------------------------------------------
+# When a friend picks "Join Game" and the game is NOT running, Steam launches it
+# with `+connect_lobby <id>` on the command line. Launching us is the instruction,
+# so the game has to read it -- miss this and the friend lands on the menu while a
+# session waits for them.
+
+func test_connect_lobby_as_two_tokens() -> void:
+	# The common shape: Steam appends the flag and the id separately.
+	var args: Array[String] = ["SteamMMO.exe", "+connect_lobby", "109775243220791364"]
+	assert_eq(NetworkManager._lobby_id_in_args(args), 109775243220791364,
+		"flag plus separate id is a lobby to join")
+
+
+func test_connect_lobby_as_one_token() -> void:
+	var args: Array[String] = ["SteamMMO.exe", "+connect_lobby 123456"]
+	assert_eq(NetworkManager._lobby_id_in_args(args), 123456,
+		"flag and id in one argument is a lobby to join")
+
+
+func test_connect_string_with_extra_tokens() -> void:
+	# A `+connect` launch string can carry more than an id; the first positive
+	# integer is the destination and the rest are none of our business.
+	var args: Array[String] = ["SteamMMO.exe", "+connect", "109775243220791364 steammmo"]
+	assert_eq(NetworkManager._lobby_id_in_args(args), 109775243220791364,
+		"the id is found even with trailing tokens")
+
+
+func test_no_invite_means_no_lobby() -> void:
+	var args: Array[String] = ["SteamMMO.exe", "--play", "--transport-canonical"]
+	assert_eq(NetworkManager._lobby_id_in_args(args), 0,
+		"an ordinary launch names no lobby")
+
+
+func test_malformed_invite_is_ignored() -> void:
+	var args: Array[String] = ["SteamMMO.exe", "+connect_lobby", "not-a-number"]
+	assert_eq(NetworkManager._lobby_id_in_args(args), 0,
+		"a non-numeric destination must not be guessed at")
+
+
+func test_dangling_flag_is_ignored() -> void:
+	var args: Array[String] = ["SteamMMO.exe", "+connect_lobby"]
+	assert_eq(NetworkManager._lobby_id_in_args(args), 0,
+		"a flag with nothing after it joins nothing")
+
+
+func test_zero_is_not_a_destination() -> void:
+	var args: Array[String] = ["SteamMMO.exe", "+connect_lobby", "0"]
+	assert_eq(NetworkManager._lobby_id_in_args(args), 0,
+		"0 is 'no lobby', so it must not start a join")
+
+
+func test_launch_invite_does_not_disturb_a_plain_run() -> void:
+	# The test process has no +connect_lobby, so this must resolve to nothing at all.
+	NetworkManager._parse_launch_invite()
+	assert_eq(NetworkManager.requested_lobby_id, 0,
+		"a normal test run is not an invite")
+
+
+#endregion
+
+
 #region Chat-adjacent identity ---------------------------------------------------
 
 func test_steam_manager_exposes_the_app_id_it_used() -> void:
