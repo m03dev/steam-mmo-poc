@@ -48,3 +48,8 @@ different size, and that is the quickest way to catch it.
 - Enemies and combat: server-authoritative mob AI (aggro/chase/leash-evade), Health component, server-validated melee, WorldState globals (registry/clock/timers/combat log), combat log HUD. Split replication so server-owned state syncs from the server, not the owning client. Protocol 2.
 - `SteamMMO_0.0007.zip` -- 44180419 bytes -- sha256 `d5565c07ed190753ddb76c880296d2fc9d95307ba2518dfa60898372c2f46207`
 
+## 0.0008 -- 2026-09-28 08:27
+
+- Integrates Pollux's in-game chat (Chat autoload, chat box HUD, dev harness) and its two fixes: canonical transport is now the default, and NetStats stops probing a disconnected peer. Chat box laid out bottom-centre so it does not sit under the combat log. Protocol 3 (new RPC-bearing autoload).
+- `SteamMMO_0.0008.zip` -- 44177996 bytes -- sha256 `2fb0f031747679dab162b2383b0c5932b622e597935c44b582b5f811645a0a06`
+

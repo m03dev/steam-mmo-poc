@@ -21,6 +21,7 @@ SteamManager="*res://autoload/SteamManager.gd"
 NetworkManager="*res://autoload/NetworkManager.gd"
 NetStats="*res://autoload/NetStats.gd"
 WorldState="*res://autoload/WorldState.gd"
+Chat="*res://autoload/Chat.gd"
 
 [display]
 

@@ -99,7 +99,13 @@ func report() -> Array[Dictionary]:
 ## peer" is the wrong question -- "is it offline" is the right one.
 func _online() -> bool:
 	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
-	return peer != null and not (peer is OfflineMultiplayerPeer)
+	if peer == null or peer is OfflineMultiplayerPeer:
+		return false
+	# A disconnected peer is still a peer object: after SERVER DISCONNECTED the
+	# client branch keeps probing peer 1 and spams "RPC via a multiplayer peer
+	# which is not connected" once a second, burying real errors. "Online" has to
+	# mean connected, which is what every caller already assumes.
+	return peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
 
 
 func _probe(peer_id: int) -> void:
