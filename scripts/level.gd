@@ -60,7 +60,7 @@ func _spawn_player(data: Variant) -> Node:
 	# Deterministic per-peer offset: every peer computes the same spot, so the
 	# spawn position agrees across the network without extra traffic.
 	player.position = spawn_point + Vector3(float(id % 4) * 2.0 - 3.0, 0.0, 0.0)
-	_tint(player, id)
+	_label_player(player, id)
 	return player
 
 
@@ -83,17 +83,23 @@ func _spawn_local() -> void:
 	var player: Node3D = PLAYER_SCENE.instantiate()
 	player.name = "player_1"
 	player.position = spawn_point
-	_tint(player, 1)
+	_label_player(player, 1)
 	players.add_child(player)
 
 
-## Give each peer's box a distinct colour so it is obvious which one is yours
-## and which are the other players' (pure testing clarity, not art).
-func _tint(player: Node3D, id: int) -> void:
-	var body: MeshInstance3D = player.get_node("Body")
-	var mat: StandardMaterial3D = StandardMaterial3D.new()
-	mat.albedo_color = Color.from_hsv(float(abs(id) % 12) / 12.0, 0.55, 0.95)
-	body.material_override = mat
+## Float a coloured name tag over every player -- pure testing clarity, so it is
+## obvious which character is yours and which belongs to the other peer.
+func _label_player(player: Node3D, id: int) -> void:
+	var label: Label3D = Label3D.new()
+	label.name = "NameTag"
+	label.text = "player_%d" % id
+	label.font_size = 64
+	label.outline_size = 16
+	label.pixel_size = 0.006
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.modulate = Color.from_hsv(float(abs(id) % 12) / 12.0, 0.65, 1.0)
+	label.position = Vector3(0.0, 2.15, 0.0)
+	player.add_child(label)
 
 
 ## Client-side overview camera, used only until our own box is spawned by the

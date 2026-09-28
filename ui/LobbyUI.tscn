@@ -6,10 +6,12 @@
 script = ExtResource("1_lobby")
 
 [node name="Margin" type="MarginContainer" parent="."]
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = 16.0
+offset_top = -360.0
 offset_right = 480.0
-offset_bottom = 372.0
+offset_bottom = -12.0
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
@@ -77,4 +79,4 @@ text = "Auto-join open World on launch"
 button_pressed = true
 
 [node name="Hint" type="Label" parent="Margin/Box"]
-text = "WASD = move   |   Mouse = look around   |   Esc = free cursor (click world to re-grab)"
+text = "WASD move | Shift run | Space jump | Mouse look | Ctrl/Esc cursor | Wheel zoom"

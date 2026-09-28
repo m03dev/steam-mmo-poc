@@ -29,6 +29,7 @@ var is_initialized: bool = false
 var steam_id: int = 0
 var persona_name: String = ""
 var last_error: String = ""
+var _shutting_down: bool = false
 
 
 func _ready() -> void:
@@ -74,12 +75,25 @@ func _initialize() -> void:
 func _process(_delta: float) -> void:
 	# Pump Steam callbacks every frame. Without this, NO lobby or P2P signal
 	# (lobby_created, lobby_joined, peer connections, ...) ever fires.
-	if is_initialized:
+	if is_initialized and not _shutting_down:
 		Steam.run_callbacks()
 
 
 func _exit_tree() -> void:
-	# Clean shutdown so the Steam client does not think we are still playing.
+	_shutdown()
+
+
+## Order matters here. The SteamMultiplayerPeer (and the Steam networking
+## callbacks it drives) must be torn down BEFORE steamShutdown(); if it is still
+## alive afterwards it touches SteamNetworkingSockets on a shut-down Steamworks
+## and the whole process segfaults (signal 11).
+func _shutdown() -> void:
+	if _shutting_down:
+		return
+	_shutting_down = true
+	var network_manager: Node = get_node_or_null("/root/NetworkManager")
+	if network_manager != null and network_manager.has_method("leave_lobby"):
+		network_manager.leave_lobby()
 	if is_initialized:
 		Steam.steamShutdown()
 		is_initialized = false

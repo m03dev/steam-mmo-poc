@@ -81,6 +81,7 @@ shape = SubResource("Shape_box")
 spawn_path = NodePath("../Players")
 
 [node name="Trigger" type="Area3D" parent="."]
+collision_mask = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -14)
 
 [node name="Mesh" type="MeshInstance3D" parent="Trigger"]
