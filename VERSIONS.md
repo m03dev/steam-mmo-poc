@@ -65,3 +65,10 @@ different size, and that is the quickest way to catch it.
 - `SteamMMO_0.0010_macos.zip` -- 66429457 bytes -- sha256 `435c1e147a49890eb416fcecf806246f32e7fd498556ffe5fe4a85cc3944436a` (macOS)
 - `build/web/` --  45M -- Web/HTML5, built from the same tree
 
+## 0.0011 -- 2026-09-28 11:39
+
+- direct-IP transport: play over LAN/IP with no Steam (itch builds); --offline/_ready scene-swap bug fixed
+- `SteamMMO_0.0011.zip` -- 44258350 bytes -- sha256 `40d2fdf86e13fd969c57919accaf114d4d306b7a772545b3ee2f9369900f88f9` (Windows)
+- `SteamMMO_0.0011_macos.zip` -- 66434066 bytes -- sha256 `3d11a3ae66751436d0a1f9db32f42d84a711afacec7ff9243c127f305c0926c9` (macOS)
+- `build/web/` --  45M -- Web/HTML5, built from the same tree
+
