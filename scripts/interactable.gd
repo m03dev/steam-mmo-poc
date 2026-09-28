@@ -82,7 +82,10 @@ func _build_marker() -> void:
 	_marker.outline_size = 20
 	_marker.pixel_size = 0.005
 	_marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_marker.position = Vector3(0.0, 1.6, 0.0)
+	# Above the tallest thing that carries a marker (a 2m capsule), so the player's
+	# own name tag does not sit on top of the glyph exactly when it matters -- as
+	# they are walking up to it to read it.
+	_marker.position = Vector3(0.0, 2.6, 0.0)
 	add_child(_marker)
 
 

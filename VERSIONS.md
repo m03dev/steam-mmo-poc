@@ -38,3 +38,8 @@ different size, and that is the quickest way to catch it.
 - Quest loop: giver offers a job, pickups collect, hand-in pays XP and bread. HUD tracker (level/XP/quest line/key hint). 60 tests, 145 asserts.
 - `SteamMMO_0.0005.zip` -- 44163249 bytes -- sha256 `dc96aa298414da70204f6428ccaa2c0e01f21e3b11dd978c2fa0c2c7bce4af1b`
 
+## 0.0006 -- 2026-09-28 07:31
+
+- PLAY is the start button (auto-join the open world, or open one if nobody is playing). Quest giver's marker now changes to a green OK when the quest is handed in instead of vanishing. Quest HUD moved top-right, clear of the dev HUD. Marker lifted above the player name tag. Verified live: gold ! marker, [E] prompt, accept fires on a real key press.
+- `SteamMMO_0.0006.zip` -- 44163437 bytes -- sha256 `c70369e0b571ebdaec0d83d5cdae543a915af34fb9a1ac7efa1f787b6a97155b`
+

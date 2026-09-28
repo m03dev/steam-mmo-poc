@@ -198,6 +198,7 @@ func test_the_giver_is_finished_with_us_after_the_hand_in() -> void:
 	_interactor.interact()  # hand in
 	await _stand(Vector3.ZERO)
 	assert_null(_interactor.current, "nothing left to offer")
-	assert_eq(giver.marker_for(_state.progress)[0], "", "and no marker left over it")
+	assert_eq(giver.marker_for(_state.progress)[0], QuestGiverScript.DONE_MARKER,
+			"and the marker must change to the done glyph rather than disappear")
 
 #endregion

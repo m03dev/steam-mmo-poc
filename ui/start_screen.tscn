@@ -50,18 +50,24 @@ horizontal_alignment = 1
 
 [node name="Sep1" type="HSeparator" parent="Center/Panel/VBox"]
 
+[node name="PlayButton" type="Button" parent="Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+theme_override_font_sizes/font_size = 22
+text = "PLAY"
+
 [node name="PlayRow1" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 8
-
-[node name="AutoWorldButton" type="Button" parent="Center/Panel/VBox/PlayRow1"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(272, 0)
-text = "Auto-Join World"
 
 [node name="HostWorldButton" type="Button" parent="Center/Panel/VBox/PlayRow1"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(272, 0)
-text = "Host World"
+text = "Host New World"
+
+[node name="HostDungeonButton" type="Button" parent="Center/Panel/VBox/PlayRow1"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(272, 0)
+text = "Host Dungeon"
 
 [node name="PlayRow2" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 8
@@ -71,10 +77,10 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(272, 0)
 text = "Auto-Join Dungeon"
 
-[node name="HostDungeonButton" type="Button" parent="Center/Panel/VBox/PlayRow2"]
+[node name="OfflineButton" type="Button" parent="Center/Panel/VBox/PlayRow2"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(272, 0)
-text = "Host Dungeon"
+text = "Play Offline (no Steam)"
 
 [node name="JoinRow" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 8
@@ -102,14 +108,9 @@ autowrap_mode = 3
 [node name="ExitRow" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 8
 
-[node name="OfflineButton" type="Button" parent="Center/Panel/VBox/ExitRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(272, 0)
-text = "Play Offline (no Steam)"
-
 [node name="QuitButton" type="Button" parent="Center/Panel/VBox/ExitRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(272, 0)
+custom_minimum_size = Vector2(560, 0)
 text = "Quit"
 
 [node name="Controls" type="Label" parent="Center/Panel/VBox"]

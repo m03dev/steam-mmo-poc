@@ -19,9 +19,9 @@ var _launch_action: String = ""
 
 
 func _ready() -> void:
+	%PlayButton.pressed.connect(_play)
 	%HostWorldButton.pressed.connect(_host.bind(NetworkManager.TYPE_WORLD))
 	%HostDungeonButton.pressed.connect(_host.bind(NetworkManager.TYPE_DUNGEON))
-	%AutoWorldButton.pressed.connect(_auto_join.bind(NetworkManager.TYPE_WORLD))
 	%AutoDungeonButton.pressed.connect(_auto_join.bind(NetworkManager.TYPE_DUNGEON))
 	_join_button.pressed.connect(_on_join_pressed)
 	%OfflineButton.pressed.connect(_enter_game)
@@ -43,10 +43,10 @@ func _ready() -> void:
 ## Dev convenience: skip the menu from the command line, so a host can be left
 ## running unattended for other peers to auto-join.
 ##   Godot --path <project> res://ui/start_screen.tscn -- --host-world
-## --host-dungeon and --offline are accepted too.
+## --host-dungeon, --play and --offline are accepted too.
 func _read_launch_action() -> String:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
-	for action: String in ["--host-world", "--host-dungeon", "--offline"]:
+	for action: String in ["--host-world", "--host-dungeon", "--play", "--offline"]:
 		if args.has(action):
 			return action
 	return ""
@@ -62,8 +62,21 @@ func _run_launch_action() -> void:
 			_host(NetworkManager.TYPE_WORLD)
 		"--host-dungeon":
 			_host(NetworkManager.TYPE_DUNGEON)
+		"--play":
+			_play()
 		"--offline":
 			_enter_game()
+
+
+## The one button a player actually needs.
+##
+## PLAY joins the open world, and opens one if nobody is playing -- that join-or-
+## host decision is already NetworkManager's, so this button is never a dead end
+## and there is no "no servers found" state to explain. The buttons below it are
+## the deliberate overrides.
+func _play() -> void:
+	_set_status("Looking for an open world...")
+	NetworkManager.auto_join_first_open(NetworkManager.TYPE_WORLD)
 
 
 func _host(lobby_type: String) -> void:
@@ -102,12 +115,12 @@ func _enter_game() -> void:
 func _on_steam_initialized(success: bool) -> void:
 	# Without Steam there is nothing to host or join with, so lock the network
 	# controls and leave offline play as the way in.
-	for button: Button in [%HostWorldButton, %HostDungeonButton,
-			%AutoWorldButton, %AutoDungeonButton, _join_button]:
+	for button: Button in [%PlayButton, %HostWorldButton, %HostDungeonButton,
+			%AutoDungeonButton, _join_button]:
 		button.disabled = not success
 	_lobby_id_input.editable = success
 	if success:
-		_set_status("Steam ready. Host a world, or join one with a Lobby ID.")
+		_set_status("PLAY joins the open world, or opens one if nobody is playing.")
 		_run_launch_action()
 	else:
 		_set_status("Steam is offline - multiplayer disabled. Use Play Offline.")
