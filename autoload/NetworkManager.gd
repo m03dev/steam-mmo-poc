@@ -127,7 +127,13 @@ func leave_lobby() -> void:
 	# tell Steam we left. Reversing this can leave remote peers hanging on a
 	# dead ID and produces "Trying to send to a removed peer" spam.
 	if peer != null:
-		multiplayer.multiplayer_peer = null
+		# `multiplayer` is null once this node is out of the tree, which is the
+		# state we are in when SteamManager tears us down from _exit_tree.
+		# Detaching is only an optimisation; CLOSING THE PEER is the part that
+		# matters -- skip the detach and still close, or Steam shuts down with a
+		# live SDR peer and the process segfaults on exit.
+		if multiplayer != null:
+			multiplayer.multiplayer_peer = null
 		peer.close()
 		peer = null
 	var was_in_lobby: bool = current_lobby_id != 0
