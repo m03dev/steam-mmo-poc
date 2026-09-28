@@ -6,20 +6,29 @@ extends CharacterBody3D
 ## the node name ("player_<peer_id>") in _enter_tree, so every peer computes the
 ## same owner with no networked handoff.
 
-const SPEED: float = 6.0
+const SPEED: float = 5.5
+const ACCELERATION: float = 34.0
+const TURN_SPEED: float = 12.0
 const GRAVITY: float = 22.0
-const MOUSE_SENSITIVITY: float = 0.0025
-const PITCH_MIN: float = -1.15
-const PITCH_MAX: float = 1.15
+const CAMERA_HEIGHT: float = 1.6
 
-@onready var camera: Camera3D = $CameraRig/Pivot/Camera3D
+## Mouse-look limits. The camera orbits the box and is deliberately INDEPENDENT
+## of the body's facing (the rig is top_level), which is what makes it possible
+## to pivot freely and walk in any direction. This decoupled-orbit + SpringArm3D
+## setup follows GDQuest's open-source third-person controller (MIT).
+const MOUSE_SENSITIVITY: float = 0.0022
+const PITCH_MIN: float = -1.0
+const PITCH_MAX: float = 1.0
+
+@onready var camera: Camera3D = $CameraRig/Pivot/SpringArm3D/Camera3D
 @onready var camera_rig: Node3D = $CameraRig
 @onready var camera_pivot: Node3D = $CameraRig/Pivot
+@onready var spring_arm: SpringArm3D = $CameraRig/Pivot/SpringArm3D
 
 ## Camera orbit, owned locally by each peer (deliberately NOT synced -- everyone
 ## is free to look around independently).
 var _cam_yaw: float = 0.0
-var _cam_pitch: float = -0.2
+var _cam_pitch: float = -0.25
 
 
 func _enter_tree() -> void:
@@ -35,6 +44,9 @@ func _ready() -> void:
 	camera.current = is_mine
 	print("[Player] %s auth=%d camera_current=%s" % [
 			name, get_multiplayer_authority(), str(is_mine)])
+	# Stop the camera's SpringArm3D from colliding with our own box (otherwise
+	# the camera would be shoved into our face).
+	spring_arm.add_excluded_object(get_rid())
 	if is_mine:
 		# Grab the mouse so it turns the camera (Esc gives it back for the UI).
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -76,8 +88,9 @@ func _physics_process(delta: float) -> void:
 	var input: Vector2 = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	# Move relative to where the camera is looking, not the world axes.
 	var dir: Vector3 = Basis(Vector3.UP, _cam_yaw) * Vector3(input.x, 0.0, input.y)
-	velocity.x = dir.x * SPEED
-	velocity.z = dir.z * SPEED
+	# Ease into and out of motion instead of snapping to full speed.
+	velocity.x = move_toward(velocity.x, dir.x * SPEED, ACCELERATION * delta)
+	velocity.z = move_toward(velocity.z, dir.z * SPEED, ACCELERATION * delta)
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	move_and_slide()
@@ -86,10 +99,11 @@ func _physics_process(delta: float) -> void:
 	if global_position.y < -20.0:
 		global_position = Vector3(0.0, 3.0, 0.0)
 		velocity = Vector3.ZERO
-	if input != Vector2.ZERO:
-		# Face the way we are walking (the box other players see turning).
-		rotation.y = atan2(dir.x, dir.z)
-	# Keep the camera pointing at the mouse yaw. The rig is a child of this
-	# (rotating) node, so subtract our own yaw to cancel the inherited turn.
-	camera_rig.rotation.y = _cam_yaw - rotation.y
+	# Turn smoothly toward the way we are walking (what others see us do).
+	if dir.length_squared() > 0.001:
+		rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), TURN_SPEED * delta)
+	# The rig is top_level, so our facing does not touch it: place it at head
+	# height and drive its rotation purely from the mouse.
+	camera_rig.global_position = global_position + Vector3.UP * CAMERA_HEIGHT
+	camera_rig.rotation.y = _cam_yaw
 	camera_pivot.rotation.x = _cam_pitch

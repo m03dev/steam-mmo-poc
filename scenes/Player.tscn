@@ -26,12 +26,15 @@ mesh = SubResource("Mesh_body")
 shape = SubResource("Shape_body")
 
 [node name="CameraRig" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+top_level = true
 
 [node name="Pivot" type="Node3D" parent="CameraRig"]
 
-[node name="Camera3D" type="Camera3D" parent="CameraRig/Pivot"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4.5)
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraRig/Pivot"]
+spring_length = 4.5
+margin = 0.2
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig/Pivot/SpringArm3D"]
 
 [node name="Synchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_1")
