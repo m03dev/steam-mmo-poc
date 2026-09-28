@@ -1,0 +1,74 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/dev_hud.gd" id="1_devhud"]
+[ext_resource type="Theme" path="res://ui/ui_theme.tres" id="2_theme"]
+
+[node name="DevHud" type="CanvasLayer"]
+layer = 20
+script = ExtResource("1_devhud")
+
+[node name="Margin" type="MarginContainer" parent="."]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 10.0
+offset_bottom = 10.0
+theme = ExtResource("2_theme")
+
+[node name="Panel" type="PanelContainer" parent="Margin"]
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Panel"]
+theme_override_constants/separation = 6
+
+[node name="Grid" type="GridContainer" parent="Margin/Panel/VBox"]
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 2
+columns = 2
+
+[node name="FpsKey" type="Label" parent="Margin/Panel/VBox/Grid"]
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 11
+text = "FPS"
+
+[node name="FpsValue" type="Label" parent="Margin/Panel/VBox/Grid"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.866667, 0.933333, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "--"
+
+[node name="NetKey" type="Label" parent="Margin/Panel/VBox/Grid"]
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 11
+text = "NET"
+
+[node name="NetValue" type="Label" parent="Margin/Panel/VBox/Grid"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.866667, 0.933333, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "--"
+
+[node name="LobbyKey" type="Label" parent="Margin/Panel/VBox/Grid"]
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 11
+text = "LOBBY"
+
+[node name="LobbyValue" type="Label" parent="Margin/Panel/VBox/Grid"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.866667, 0.933333, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "--"
+
+[node name="AvatarKey" type="Label" parent="Margin/Panel/VBox/Grid"]
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 11
+text = "AVATAR"
+
+[node name="AvatarValue" type="Label" parent="Margin/Panel/VBox/Grid"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.866667, 0.933333, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "--"
+
+[node name="MenuButton" type="Button" parent="Margin/Panel/VBox"]
+unique_name_in_owner = true
+theme_override_font_sizes/font_size = 12
+text = "Menu"

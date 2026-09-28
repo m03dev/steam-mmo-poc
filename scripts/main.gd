@@ -1,10 +1,13 @@
 extends Node3D
 ## Main -- the persistent game shell.
 ##
-## Keeps the debug LobbyUI alive and swaps the level underneath it when the
+## Keeps the dev overlay alive and swaps the level underneath it when the
 ## networking session moves between lobby types (world <-> dungeon). Step 5 of
 ## the design: the scene change follows NetworkManager's `lobby_joined`, never
 ## the other way round.
+##
+## This scene is only ever reached with a session already established -- either
+## the player picked a lobby on StartScreen, or chose offline play.
 
 const WORLD: PackedScene = preload("res://scenes/World.tscn")
 const DUNGEON: PackedScene = preload("res://scenes/Dungeon.tscn")

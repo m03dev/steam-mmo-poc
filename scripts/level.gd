@@ -1,3 +1,4 @@
+class_name Level
 extends Node3D
 ## Level -- blockout used for both the open world and the dungeon.
 ##
@@ -57,11 +58,16 @@ func _spawn_player(data: Variant) -> Node:
 	var player: Node3D = PLAYER_SCENE.instantiate()
 	var id: int = int(data)
 	player.name = "player_%d" % id
-	# Deterministic per-peer offset: every peer computes the same spot, so the
-	# spawn position agrees across the network without extra traffic.
-	player.position = spawn_point + Vector3(float(id % 4) * 2.0 - 3.0, 0.0, 0.0)
+	player.position = spawn_point + spawn_offset_for(id)
 	_label_player(player, id)
 	return player
+
+
+## Deterministic per-peer offset: every peer derives the same spot from the id
+## alone, so spawn positions agree across the network with no extra traffic.
+## Static and pure, which also makes the spread unit-testable.
+static func spawn_offset_for(peer_id: int) -> Vector3:
+	return Vector3(float(peer_id % 4) * 2.0 - 3.0, 0.0, 0.0)
 
 
 func _spawn(id: int) -> void:
@@ -93,9 +99,9 @@ func _label_player(player: Node3D, id: int) -> void:
 	var label: Label3D = Label3D.new()
 	label.name = "NameTag"
 	label.text = "player_%d" % id
-	label.font_size = 64
-	label.outline_size = 16
-	label.pixel_size = 0.006
+	label.font_size = 48
+	label.outline_size = 12
+	label.pixel_size = 0.004
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.modulate = Color.from_hsv(float(abs(id) % 12) / 12.0, 0.65, 1.0)
 	label.position = Vector3(0.0, 2.15, 0.0)

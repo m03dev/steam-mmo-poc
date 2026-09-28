@@ -1,0 +1,120 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/start_screen.gd" id="1_start"]
+[ext_resource type="Theme" path="res://ui/ui_theme.tres" id="2_theme"]
+
+[node name="StartScreen" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_start")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0431373, 0.0509804, 0.0666667, 1)
+
+[node name="Center" type="CenterContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="Center"]
+
+[node name="VBox" type="VBoxContainer" parent="Center/Panel"]
+custom_minimum_size = Vector2(560, 0)
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Center/Panel/VBox"]
+theme_override_colors/font_color = Color(0.921569, 0.964706, 1, 1)
+theme_override_font_sizes/font_size = 30
+text = "STEAM MMO POC"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Center/Panel/VBox"]
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 12
+text = "Godot 4  |  Steam SDR relay  |  host-authoritative  |  world + dungeon"
+horizontal_alignment = 1
+
+[node name="Identity" type="Label" parent="Center/Panel/VBox"]
+unique_name_in_owner = true
+theme_override_font_sizes/font_size = 13
+text = "Steam: -"
+horizontal_alignment = 1
+
+[node name="Sep1" type="HSeparator" parent="Center/Panel/VBox"]
+
+[node name="PlayRow1" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 8
+
+[node name="AutoWorldButton" type="Button" parent="Center/Panel/VBox/PlayRow1"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(272, 0)
+text = "Auto-Join World"
+
+[node name="HostWorldButton" type="Button" parent="Center/Panel/VBox/PlayRow1"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(272, 0)
+text = "Host World"
+
+[node name="PlayRow2" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 8
+
+[node name="AutoDungeonButton" type="Button" parent="Center/Panel/VBox/PlayRow2"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(272, 0)
+text = "Auto-Join Dungeon"
+
+[node name="HostDungeonButton" type="Button" parent="Center/Panel/VBox/PlayRow2"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(272, 0)
+text = "Host Dungeon"
+
+[node name="JoinRow" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 8
+
+[node name="LobbyIdInput" type="LineEdit" parent="Center/Panel/VBox/JoinRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(384, 0)
+placeholder_text = "Lobby ID to join"
+caret_blink = true
+
+[node name="JoinButton" type="Button" parent="Center/Panel/VBox/JoinRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 34)
+text = "Join Lobby"
+
+[node name="Status" type="Label" parent="Center/Panel/VBox"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.607843, 0.811765, 0.964706, 1)
+theme_override_font_sizes/font_size = 12
+text = "Starting..."
+autowrap_mode = 3
+
+[node name="Sep2" type="HSeparator" parent="Center/Panel/VBox"]
+
+[node name="ExitRow" type="HBoxContainer" parent="Center/Panel/VBox"]
+theme_override_constants/separation = 8
+
+[node name="OfflineButton" type="Button" parent="Center/Panel/VBox/ExitRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(272, 0)
+text = "Play Offline (no Steam)"
+
+[node name="QuitButton" type="Button" parent="Center/Panel/VBox/ExitRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(272, 0)
+text = "Quit"
+
+[node name="Controls" type="Label" parent="Center/Panel/VBox"]
+theme_override_colors/font_color = Color(0.423529, 0.494118, 0.576471, 1)
+theme_override_font_sizes/font_size = 11
+text = "WASD move   ·   Space jump   ·   Shift run   ·   Mouse look   ·   Ctrl/Esc cursor   ·   Wheel zoom   ·   F3 dev hud"
+horizontal_alignment = 1
+autowrap_mode = 3
