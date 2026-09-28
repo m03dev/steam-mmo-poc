@@ -52,14 +52,24 @@ That is the whole account half. He does **not** need to know anything about uplo
 
 ### Then, to let me upload builds (one of two options)
 
-**Option A — preferred, and he never hands over a key.** He installs `butler` (itch's
-upload tool) and runs `butler login` **himself, interactively**, once. The credential lands
-in `~/.config/itch/butler_creds` on this Mac and buttons the machine to his account. I then
-push builds without ever seeing a key. Install lines: **https://itch.io/docs/butler/**
+**`butler` is already installed** — `~/Applications/butler/butler`, v15.31.0. Not on `PATH`;
+call it by that path, or add `~/Applications/butler` to `PATH`. Note the download host:
+`broth.itch.ovh` **does not resolve** from this machine, use **`broth.itch.zone`**
+(`https://broth.itch.zone/butler/darwin-amd64/LATEST/archive/default`, a redirect). There is
+no Homebrew here.
 
-**Option B** — he creates an API key in itch's settings and pastes it here; I run
-`butler login`/`butler push` with it. Faster, but the key is account-wide, so Option A is
-better hygiene.
+So the only thing still missing is **auth**, one of:
+
+**Option A — preferred, and Mohamed never hands over a key.** He runs this once, himself:
+
+    ~/Applications/butler/butler login
+
+It stores a credential in `~/.config/itch/butler_creds` (currently absent) and buttons this
+machine to his account. I then push builds without ever holding a key.
+
+**Option B** — he creates an API key in itch's settings and passes it to me; butler reads it
+from `BUTLER_API_KEY` for a single push. Faster, worse hygiene: the key is account-wide and
+should be revoked afterwards.
 
 ## What I do once the page exists
 
@@ -110,10 +120,9 @@ line. itch shows the first four on the page, so the first one should be the wide
       for the page saying "multiplayer" at all). — *owner: Castor, not started*
 - [x] **2. The account exists** — Mohamed has one. Still needed from him: the **username**
       and the **page slug**, so a push has a target. (Page: <https://itch.io/game/new>.)
-- [ ] **3. Get `butler` working.** It is installed nowhere yet (checked). `broth.itch.ovh` did
-      **not resolve** from this machine, so the usual one-line download failed — fetch it from
-      itch's docs page instead (<https://itch.io/docs/butler/>). Then either Mohamed runs
-      `butler login` once himself, or he hands over an API key.
+- [ ] **3. Get `butler` working.** Installed: `~/Applications/butler/butler` v15.31.0 (see the
+      correction about `broth.itch.zone` above). What is still missing is **auth** — either
+      Mohamed runs `butler login` once, or he hands over an API key.
 - [ ] **4. Castor: push the first build** and take the screenshots.
 - [ ] **5. Verify the download runs on a machine that has never seen this project** — the
       only honest test of a distributable. Windows build on Pollux's box is the obvious
