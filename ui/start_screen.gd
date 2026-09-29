@@ -271,7 +271,7 @@ func _refresh_lobbies() -> void:
 func _on_lobby_list_updated(summaries: Array[Dictionary]) -> void:
 	_show_lobby_rows(summaries)
 	_lobby_list_status.text = lobby_list_status_text(summaries.size(), true,
-		joinable_count(summaries))
+		joinable_count(summaries), mine_count(summaries))
 
 
 ## Rows rather than a sentence, because that is the difference between being told a world exists
@@ -282,10 +282,12 @@ func _show_lobby_rows(summaries: Array[Dictionary]) -> void:
 	for row: Dictionary in summaries:
 		var button := Button.new()
 		button.text = lobby_row_text(row)
-		# A row offering a build we cannot join is a trap, and a click that is certain to fail
-		# is not a choice. It stays visible - a friend on the old build is information - but it
-		# says so and does not pretend to be pressable.
-		button.disabled = not bool(row.get("compatible", true))
+		# Two rows are shown but not pressable, for the same reason: a click that is certain to
+		# fail is not a choice. "mine" is the world you are already in - pressing it would mean
+		# leaving and rejoining your own session - and an incompatible row is a friend on a build
+		# you cannot enter. Both stay visible because both are information.
+		button.disabled = bool(row.get("mine", false)) \
+				or not bool(row.get("compatible", true))
 		button.pressed.connect(_join_from_list.bind(int(row.get("id", 0))))
 		_lobby_list_box.add_child(button)
 
@@ -314,29 +316,54 @@ static func lobby_row_text(row: Dictionary) -> String:
 		return "%s  -  different version (%s)" % [label, str(row.get("version", "?"))]
 	var members: int = int(row.get("members", 0))
 	var maximum: int = int(row.get("max", 0))
+	var text: String = label
 	if maximum > 0 and members >= maximum:
-		return "%s  -  FULL (%d/%d)" % [label, members, maximum]
-	return "%s  -  %d/%d" % [label, members, maximum]
+		text += "  -  FULL (%d/%d)" % [members, maximum]
+	else:
+		text += "  -  %d/%d" % [members, maximum]
+	# Who is actually in there. A player deciding between two worlds is deciding who to play with,
+	# and a head-count alone cannot say that.
+	var players: Array = row.get("players", [])
+	if players.size() > 0:
+		text += "  (%s)" % ", ".join(players)
+	if bool(row.get("mine", false)):
+		return "YOUR WORLD  -  %s" % text
+	return text
 
 
-## How many listed worlds this build can actually join.
+## How many listed rows are worlds we can join. Our own is not one of them: we are already in it.
 static func joinable_count(rows: Array[Dictionary]) -> int:
 	var total: int = 0
 	for row: Dictionary in rows:
-		if bool(row.get("compatible", true)):
+		if bool(row.get("compatible", true)) and not bool(row.get("mine", false)):
+			total += 1
+	return total
+
+
+## How many listed rows are the world we are already in - at most one, but counted rather than
+## assumed, so a stale duplicate cannot silently make the menu lie.
+static func mine_count(rows: Array[Dictionary]) -> int:
+	var total: int = 0
+	for row: Dictionary in rows:
+		if bool(row.get("mine", false)):
 			total += 1
 	return total
 
 
 ## The line under the list. A count of -1 means the answer has not arrived yet, which is a
 ## different state from "there is nothing open" and must never read as one.
-static func lobby_list_status_text(count: int, steam_ready: bool, joinable: int = -1) -> String:
+static func lobby_list_status_text(count: int, steam_ready: bool, joinable: int = -1,
+		mine: int = 0) -> String:
 	if not steam_ready:
 		return "Sign in to the Steam app to see open worlds here."
 	if count < 0:
 		return "Looking for open worlds..."
 	if count == 0:
 		return "No open worlds yet. PLAY opens one, and friends will see it here."
+	# A host cannot be shown their own world by Steam, so it is pinned above this list by hand.
+	# When it is the only row, the honest line is not "none you can join" but "this is yours".
+	if mine > 0 and joinable == 0:
+		return "You are hosting a world - it is shown above. Friends see it in their list."
 	# A list of worlds you cannot enter is not an invitation, so the line must not promise one.
 	if joinable == 0:
 		return "%d open world%s, but none this build can join - they are a different version." % [

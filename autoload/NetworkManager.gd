@@ -372,12 +372,71 @@ static func is_our_lobby(lobby_type: String, version: String, protocol: String) 
 	return lobby_type in OUR_LOBBY_TYPES and not version.is_empty() and not protocol.is_empty()
 
 
-## The rows a menu draws, built from the raw ids Steam returns.
+## The names of the people in a lobby.
+##
+## Member data (published by every peer as it joins) works for players who are NOT on your friends
+## list. getFriendPersonaName does not - it returns "" for a stranger - so it is only a fallback,
+## which is the difference between "Someone's world" and "Zukei's world" for a lobby found in the
+## list.
+func _players_in(lobby_id: int) -> Array[String]:
+	var names: Array[String] = []
+	# GodotSteam enumerates members by INDEX (getLobbyMemberByIndex), not by packing them into an
+	# array, so the count and the index have to be walked together.
+	var count: int = Steam.getNumLobbyMembers(lobby_id)
+	for index in count:
+		names.append(_member_name(lobby_id, Steam.getLobbyMemberByIndex(lobby_id, index)))
+	return names
+
+
+func _member_name(lobby_id: int, member_id: int) -> String:
+	var published: String = Steam.getLobbyMemberData(lobby_id, member_id, "name")
+	if not published.is_empty():
+		return published
+	# Never ask for a persona that cannot be resolved: a lobby we are not in can report an owner
+	# Steam refuses to look up, and that failure repeats once per row per refresh.
+	if member_id > 0:
+		var persona: String = Steam.getFriendPersonaName(member_id)
+		if not persona.is_empty():
+			return persona
+	return "Player"
+
+
+## The row for the lobby WE are in.
+##
+## Steam's lobby list cannot show you your own lobby: a host opens the menu and sees an empty list,
+## which reads as "my world is not visible" even though it is live for everyone else. That is exactly
+## how it was reported. So this row is built locally and pinned to the top - the host gets
+## confirmation that their world is up, and nobody has to wonder.
+func local_lobby_summary() -> Dictionary:
+	if current_lobby_id == 0:
+		return {}
+	var limit: int = Steam.getLobbyMemberLimit(current_lobby_id)
+	if limit <= 0:
+		limit = MAX_MEMBERS
+	return {
+		"id": current_lobby_id,
+		"name": "%s's %s" % [SteamManager.persona_name, current_lobby_type],
+		"type": current_lobby_type,
+		"members": Steam.getNumLobbyMembers(current_lobby_id),
+		"max": limit,
+		"owner": SteamManager.persona_name,
+		"players": _players_in(current_lobby_id),
+		"version": GAME_VERSION,
+		"compatible": true,
+		"mine": true,
+	}
+
+
+## The rows a menu draws, built from the raw ids Steam returns - plus our own lobby, which Steam
+## will not return, pinned at the top and never counted twice.
 func _lobby_summaries(lobbies: Array) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
+	var mine: Dictionary = local_lobby_summary()
+	if not mine.is_empty():
+		rows.append(mine)
 	for entry: Variant in lobbies:
 		var lobby_id: int = _lobby_id_of(entry)
-		if lobby_id == 0:
+		if lobby_id == 0 or lobby_id == current_lobby_id:
 			continue
 		var lobby_type: String = Steam.getLobbyData(lobby_id, KEY_TYPE)
 		var version: String = Steam.getLobbyData(lobby_id, KEY_VERSION)
@@ -387,13 +446,10 @@ func _lobby_summaries(lobbies: Array) -> Array[Dictionary]:
 		var limit: int = Steam.getLobbyMemberLimit(lobby_id)
 		if limit <= 0:
 			limit = MAX_MEMBERS
-		# A lobby we are not in can report an owner we cannot resolve, and asking for their
-		# persona then fails once per refresh per lobby. An unnamed host is a missing nicety,
-		# not a reason to fill the log.
-		var owner_name: String = ""
 		var owner_id: int = Steam.getLobbyOwner(lobby_id)
-		if owner_id > 0:
-			owner_name = Steam.getFriendPersonaName(owner_id)
+		var owner_name: String = _member_name(lobby_id, owner_id) if owner_id > 0 else ""
+		if owner_name == "Player":
+			owner_name = ""
 		rows.append({
 			"id": lobby_id,
 			"name": "%s's %s" % [owner_name if not owner_name.is_empty() else "Someone",
@@ -402,10 +458,12 @@ func _lobby_summaries(lobbies: Array) -> Array[Dictionary]:
 			"members": Steam.getNumLobbyMembers(lobby_id),
 			"max": limit,
 			"owner": owner_name,
+			"players": _players_in(lobby_id),
 			# Additive to the frozen row: a list that offers a build you cannot join is a trap,
 			# so the UI needs to know before the click.
 			"version": version,
 			"compatible": version == GAME_VERSION,
+			"mine": false,
 		})
 	return order_summaries(rows)
 
@@ -416,6 +474,12 @@ func _lobby_summaries(lobbies: Array) -> Array[Dictionary]:
 static func order_summaries(rows: Array[Dictionary]) -> Array[Dictionary]:
 	var sorted_rows: Array[Dictionary] = rows.duplicate()
 	sorted_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		# Our own lobby is not a choice among others, it is where we are: it stays pinned on top
+		# so the host can see that their world is up.
+		var a_mine: bool = bool(a.get("mine", false))
+		var b_mine: bool = bool(b.get("mine", false))
+		if a_mine != b_mine:
+			return a_mine
 		var a_open: bool = int(a.get("members", 0)) < int(a.get("max", 0))
 		var b_open: bool = int(b.get("members", 0)) < int(b.get("max", 0))
 		if a_open != b_open:

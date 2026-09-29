@@ -175,4 +175,26 @@ func test_a_mixed_list_keeps_the_good_row_pressable() -> void:
 	assert_eq(START_SCREEN_SCRIPT.joinable_count([old, _row(2, 1, 8)] as Array[Dictionary]), 1,
 		"and only one of the two counts as joinable")
 
+
+func test_a_row_names_the_people_in_it() -> void:
+	# A head-count cannot answer "who am I playing with", which is the actual choice being made
+	# between two open worlds.
+	var row: Dictionary = _row(1, 2, 8)
+	row["players"] = ["Zukei", "ma.culo"] as Array[String]
+	var text: String = START_SCREEN_SCRIPT.lobby_row_text(row)
+	assert_true(text.contains("Zukei"), "the players are named")
+	assert_true(text.contains("ma.culo"), "all of them")
+
+
+func test_our_own_world_row_says_it_is_ours_and_cannot_be_pressed() -> void:
+	var screen: Control = _screen()
+	var mine: Dictionary = _row(7, 1, 8)
+	mine["mine"] = true
+	screen._on_lobby_list_updated([mine] as Array[Dictionary])
+	var row: Button = screen.get_node("%LobbyListBox").get_child(0)
+	assert_true(row.text.begins_with("YOUR WORLD"), "the row says whose world it is: %s" % row.text)
+	assert_true(row.disabled, "and it is not a place to join - we are already in it")
+	assert_true(screen.get_node("%LobbyListStatus").text.contains("hosting"),
+		"the line above says the world shown is the player's own")
+
 #endregion

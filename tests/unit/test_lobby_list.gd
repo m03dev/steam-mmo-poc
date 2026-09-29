@@ -7,6 +7,8 @@ extends GutTest
 ## not hang on, because no callback is ever coming.
 
 const NETWORK_MANAGER_SCRIPT := "res://autoload/NetworkManager.gd"
+# The screen's pure wording helpers, by path: the start screen has no class_name.
+const START_SCREEN_SCRIPT := preload("res://ui/start_screen.gd")
 
 
 func _row(id: int, members: int, maximum: int) -> Dictionary:
@@ -96,6 +98,37 @@ func test_an_older_build_of_ours_is_still_a_world() -> void:
 	# version note is for.
 	assert_true(NetworkManager.is_our_lobby("world", "0.0012", "3"),
 		"an old build of ours is still ours")
+
+
+func test_the_world_we_are_in_is_pinned_above_the_others() -> void:
+	# Reported by Mohamed: host a world, open the menu, and the world is not in the list. Steam
+	# cannot return a lobby the local user is already in, so ours is built locally and pinned -
+	# otherwise a host's own world is invisible to the one person certain it exists.
+	var mine: Dictionary = _row(1, 2, 8)
+	mine["mine"] = true
+	var theirs: Dictionary = _row(2, 7, 8)
+	var ordered: Array[Dictionary] = NetworkManager.order_summaries([theirs, mine])
+	assert_eq(int(ordered[0]["id"]), 1, "our own world comes first, however busy the others are")
+	assert_true(bool(ordered[0]["mine"]), "and it is still marked as ours")
+
+
+func test_our_own_world_is_not_offered_as_a_place_to_join() -> void:
+	# Joining the session you are already in would mean leaving it first. The row is
+	# information, not an action.
+	var mine: Dictionary = _row(1, 2, 8)
+	mine["mine"] = true
+	assert_eq(START_SCREEN_SCRIPT.joinable_count([mine] as Array[Dictionary]), 0,
+		"a world we are already in is not a world to join")
+	assert_eq(START_SCREEN_SCRIPT.mine_count([mine] as Array[Dictionary]), 1,
+		"but it is counted as ours")
+
+
+
+func test_the_only_world_being_ours_does_not_read_as_an_empty_list() -> void:
+	# The exact moment Mohamed hit: hosting, opening the menu, and being told there is nothing.
+	var line: String = START_SCREEN_SCRIPT.lobby_list_status_text(1, true, 0, 1)
+	assert_true(line.contains("hosting"), "the line says the world shown is the player's own: %s" % line)
+	assert_false(line.contains("No open worlds"), "and does not claim nothing is open")
 
 
 func test_a_build_we_cannot_join_sorts_below_one_we_can() -> void:
