@@ -93,3 +93,12 @@ different size, and that is the quickest way to catch it.
 - `SteamMMO_0.0014_macos.zip` -- 66573012 bytes -- sha256 `1ace5dd5ccc6561654b121c0b3983d3a933a3ff602ddf44a1e65805d709b8ed1` (macOS)
 - `build/web/` --  46M -- Web/HTML5, built from the same tree
 
+## 0.0015 -- 2026-09-28 22:23
+
+- a puppet re-states its pose, so a moving remote player keeps moving (0.0014 sent the animation
+  name once and the model pulled it back to idle about a second later - found by a test written
+  to measure it, after 0.0014 had already shipped)
+- `SteamMMO_0.0015.zip` -- 45226591 bytes -- sha256 `3013546d0cb693f8623c351eefa01f14c4a19b280670f77a0cedd4a7f5437c7e` (Windows)
+- `SteamMMO_0.0015_macos.zip` -- 67065443 bytes -- sha256 `b720b1ecad5c75e081c6480932233f3086d2549467129197b6e24877185fb18d` (macOS)
+- `build/web/` --  46M -- Web/HTML5, built from the same tree
+
