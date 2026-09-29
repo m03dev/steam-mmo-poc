@@ -70,6 +70,11 @@ green. `main` must always be releasable.
 
 * **While a shared test is pending, nobody edits, commits or cuts.** A frozen artifact under test
   is worth more than an improved one.
+* **A NEW REQUIREMENT FROM THE HUMAN LIFTS THE FREEZE**, and the FIRST thing the writer does is
+  update `CANONICAL.md` on the shared Drive - not the last. Learned the hard way: a fix was cut and
+  pushed while the other agent was writing the freeze document, so the two files disagreed about which
+  build was real, which is precisely the churn the freeze exists to prevent. The freeze protects a
+  *test*, and a new instruction from the human outranks it.
 * **A change that alters shipped bytes needs its own version.** One fix, one version, one cut,
   one push, one verification. Never re-cut a version that is already live - same number,
   different bytes, no way to tell them apart afterwards.
