@@ -1,0 +1,68 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/level.gd" id="1_level"]
+
+[sub_resource type="Environment" id="Env_1"]
+background_mode = 1
+background_color = Color(0.09, 0.07, 0.13, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.62, 0.6, 0.72, 1)
+ambient_light_energy = 0.8
+
+[sub_resource type="BoxMesh" id="Mesh_ground"]
+size = Vector3(36, 1, 36)
+
+[sub_resource type="BoxShape3D" id="Shape_ground"]
+size = Vector3(36, 1, 36)
+
+[sub_resource type="BoxMesh" id="Mesh_pillar"]
+size = Vector3(2, 4, 2)
+
+[sub_resource type="BoxShape3D" id="Shape_pillar"]
+size = Vector3(2, 4, 2)
+
+[node name="Arena" type="Node3D"]
+script = ExtResource("1_level")
+level_type = "arena"
+spawn_point = Vector3(0, 1, -12)
+enemy_spawns = Array[Vector3]([])
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_1")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8, -0.4, 0.45, 0, 0.7, 0.7, -0.6, -0.6, 0.55, 0, 16, 0)
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("Mesh_ground")
+
+[node name="GroundShape" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("Shape_ground")
+
+[node name="Pillar1" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 2, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Pillar1"]
+mesh = SubResource("Mesh_pillar")
+
+[node name="Shape" type="CollisionShape3D" parent="Pillar1"]
+shape = SubResource("Shape_pillar")
+
+[node name="Pillar2" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Pillar2"]
+mesh = SubResource("Mesh_pillar")
+
+[node name="Shape" type="CollisionShape3D" parent="Pillar2"]
+shape = SubResource("Shape_pillar")
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="Spawner" type="MultiplayerSpawner" parent="."]
+spawn_path = NodePath("../Players")

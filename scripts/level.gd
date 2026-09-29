@@ -30,14 +30,18 @@ var _fallback_cam: Camera3D = null
 
 @onready var spawner: MultiplayerSpawner = $Spawner
 @onready var players: Node3D = $Players
-@onready var trigger: Area3D = $Trigger
+## Some levels have no portal, and that is content, not an error: the arena is reached by
+## the match button, so a missing Trigger must simply leave this level without one --
+## rather than taking the level down with it on the first @onready line.
+@onready var trigger: Area3D = get_node_or_null("Trigger") as Area3D
 @onready var enemy_spawner: MultiplayerSpawner = get_node_or_null("EnemySpawner") as MultiplayerSpawner
 @onready var enemies: Node3D = get_node_or_null("Enemies") as Node3D
 
 
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player
-	trigger.body_entered.connect(_on_trigger_entered)
+	if trigger != null:
+		trigger.body_entered.connect(_on_trigger_entered)
 	# The session can outlive its host: NetworkManager decides that and tells us here,
 	# because the node surgery it needs is ours to do (see _on_host_migrated).
 	NetworkManager.host_migrated.connect(_on_host_migrated)

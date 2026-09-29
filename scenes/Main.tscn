@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://ui/dev_hud.tscn" id="2_devhud"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://ui/chat_box.tscn" id="6_chat"]
 [ext_resource type="PackedScene" path="res://ui/inventory_panel.tscn" id="4_inv"]
 [ext_resource type="PackedScene" path="res://ui/combat_log.tscn" id="5_log"]
+[ext_resource type="PackedScene" path="res://ui/match_panel.tscn" id="7_match"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -21,3 +22,5 @@ script = ExtResource("1_main")
 [node name="DevHud" parent="." instance=ExtResource("2_devhud")]
 
 [node name="ChatBox" parent="." instance=ExtResource("6_chat")]
+
+[node name="MatchPanel" parent="." instance=ExtResource("7_match")]

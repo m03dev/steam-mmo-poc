@@ -22,6 +22,7 @@ NetworkManager="*res://autoload/NetworkManager.gd"
 NetStats="*res://autoload/NetStats.gd"
 WorldState="*res://autoload/WorldState.gd"
 Chat="*res://autoload/Chat.gd"
+Match="*res://autoload/match.gd"
 
 [display]
 
