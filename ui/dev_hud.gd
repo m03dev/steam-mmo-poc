@@ -97,9 +97,14 @@ static func session_role(lobby_id: int, is_direct: bool, is_host: bool) -> Strin
 	return "%s (direct)" % role if is_direct else role
 
 
-## Our own Steam account, so a screenshot of this panel identifies the peer.
+## Our own account, so a screenshot of this panel identifies the peer: Steam's name
+## for the account plus its SteamID64, not just the number. Only meaningful when
+## Steam is up -- a direct-IP session run without Steam has no account to show, and
+## the transport is already named on the LOBBY row.
 func _steam_suffix() -> String:
-	return "   %d" % SteamManager.steam_id if SteamManager.is_initialized else ""
+	if not SteamManager.is_initialized:
+		return ""
+	return "   " + SteamManager.identity_for(multiplayer.get_unique_id())
 
 
 ## Round-trip summary. The per-peer detail lives in the PEERS rows; this line is
@@ -151,19 +156,23 @@ func _show_peers() -> void:
 			_peer_rows.erase(peer_id)
 
 
-## "<peer id> <name> <ping> [steam <ping>] [q <quality>]" -- only the parts we
-## actually have. The peer id leads because that is the id replication uses, unless
-## the name already IS the id ("player_<id>", which is what a peer with no Steam
-## identity is called): printing both would say the same number twice.
+## "<name> (<SteamID64>)  <ping> [steam <ping>] [q <quality>]".
+##
+## The account number is the point of this row. A multiplayer peer id is a
+## truncated SteamID64, so printing it (324528183) tells the reader nothing they can
+## check against a real account -- while 76561198632049032 is the actual Steam
+## account on the other machine. NetStats already carries that id; nothing showed
+## it until now. A peer with no Steam identity at all (direct-IP/ENet) falls back to
+## the replication name "player_<peer id>", which is at least the id the code uses.
 func _peer_line(row: Dictionary) -> String:
 	var peer_id: int = int(row["peer_id"])
 	var peer_name: String = str(row["name"])
+	var steam_id: int = int(row["steam_id"])
 	var parts: PackedStringArray = PackedStringArray()
-	if peer_name == "player_%d" % peer_id:
-		parts.append(peer_name)
-	else:
-		parts.append(str(peer_id))
-		parts.append(peer_name)
+	# When Steam's name could not be read, NetStats falls back to the id itself;
+	# passing that as the persona too would print the number twice.
+	var persona: String = "" if peer_name == str(steam_id) else peer_name
+	parts.append(SteamManager.identity_text(peer_id, steam_id, persona))
 	parts.append(_format_ms(int(row["ping"])))
 	var steam_ping: int = int(row["steam_ping"])
 	if steam_ping >= 0:

@@ -72,3 +72,10 @@ different size, and that is the quickest way to catch it.
 - `SteamMMO_0.0011_macos.zip` -- 66434066 bytes -- sha256 `3d11a3ae66751436d0a1f9db32f42d84a711afacec7ff9243c127f305c0926c9` (macOS)
 - `build/web/` --  45M -- Web/HTML5, built from the same tree
 
+## 0.0012 -- 2026-09-28 18:32
+
+- macOS bundle is re-signed after our own rename/plutil broke Godot's signature -- a broken signature made macOS call the app 'damaged' for every downloader
+- `SteamMMO_0.0012.zip` -- 44736782 bytes -- sha256 `e60e0acb7636e8af3edd966ac2dd7d7329905349a98c2925098a86df07b8ea44` (Windows)
+- `SteamMMO_0.0012_macos.zip` -- 66473082 bytes -- sha256 `32b85ab74ca8828216ede80005b1dc416ad58a8e093a3d170c83666567652f4a` (macOS)
+- `build/web/` --  45M -- Web/HTML5, built from the same tree
+

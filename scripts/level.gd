@@ -163,18 +163,28 @@ func _spawn_local() -> void:
 	players.add_child(player)
 
 
-## Float a coloured name tag over every player -- pure testing clarity, so it is
-## obvious which character is yours and which belongs to the other peer.
+## Float a name tag over every player -- pure testing clarity, so it is obvious
+## which character is yours and which belongs to the other peer.
+##
+## The tag names the ACCOUNT, not the peer id: a second line carries the SteamID64
+## and the local avatar is marked "(you)". "player_2" tells a screenshot nothing --
+## every session numbers its peers the same way -- whereas 76561198632049032 is the
+## Windows account and 76561198063757123 is the Mac one, and Steam's own name for
+## each sits on top. A direct-IP session has no Steam identity to show, so there the
+## tag stays the replication name it always was (SteamManager.name_tag_for decides).
 func _label_player(player: Node3D, id: int) -> void:
 	var label: Label3D = Label3D.new()
 	label.name = "NameTag"
-	label.text = "player_%d" % id
+	label.text = SteamManager.name_tag_for(id)
 	label.font_size = 48
 	label.outline_size = 12
 	label.pixel_size = 0.004
+	# The second line (the account number) needs room: the default spacing would
+	# let a three-line tag overlap itself.
+	label.line_spacing = -0.15
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.modulate = Color.from_hsv(float(abs(id) % 12) / 12.0, 0.65, 1.0)
-	label.position = Vector3(0.0, 2.15, 0.0)
+	label.position = Vector3(0.0, 2.55, 0.0)
 	player.add_child(label)
 
 

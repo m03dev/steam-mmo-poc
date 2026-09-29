@@ -153,6 +153,81 @@ func _shutdown() -> void:
 		is_initialized = false
 
 
+#region Peer identity -----------------------------------------------------------
+#
+# One place that answers "who is this peer, in human terms", so the name tag over
+# a player, the dev HUD's PEERS rows and the NET row cannot drift apart.
+#
+# A peer id is an implementation detail: it is 1 for the host on every client, and
+# a truncated number for everyone else. Nobody can confirm two players are two
+# accounts from an id like that. The SteamID64 (7656119...) and Steam's own name
+# for that account are the things a screenshot can actually prove, so both are
+# shown wherever a peer is named.
+#
+# The two formatters are `static` and take their inputs as arguments ON PURPOSE:
+# the shape of these strings is pinned by a unit test with no Steam running and no
+# peer at all, which the live lookup functions could not be.
+
+## The SteamID64 behind a multiplayer peer id, or 0 when there is no Steam identity
+## to report (direct-IP/ENet session, Steam down, or a peer Steam does not know yet).
+func peer_steam_id(peer_id: int) -> int:
+	if not is_initialized:
+		return 0
+	# Our own peer id needs no lookup, and asking Steam about it is the one case
+	# where a miss would mislabel the player looking at the screen.
+	if peer_id == multiplayer.get_unique_id():
+		return steam_id
+	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
+	if peer is SteamMultiplayerPeer:
+		return (peer as SteamMultiplayerPeer).get_steam_id_for_peer_id(peer_id)
+	return 0
+
+
+## Steam's name for an account, "" when it cannot be read (not a friend, no cache).
+func persona_for(steam_id: int) -> String:
+	if steam_id == 0 or not is_initialized:
+		return ""
+	return Steam.getFriendPersonaName(steam_id)
+
+
+## "Zukei (76561198063757123)", or "player_7" for a peer with no Steam identity.
+static func identity_text(peer_id: int, steam_id: int, persona: String) -> String:
+	if steam_id == 0:
+		return "player_%d" % peer_id
+	if persona.is_empty():
+		return str(steam_id)
+	return "%s (%d)" % [persona, steam_id]
+
+
+## The floating tag over a player, two lines so the long number never crowds the
+## name: name on top, SteamID64 underneath, "(you)" on the local avatar. Falls back
+## to the replication name in a session with no Steam behind it.
+static func name_tag_text(peer_id: int, steam_id: int, persona: String, is_local: bool) -> String:
+	if steam_id == 0:
+		var bare: String = "player_%d" % peer_id
+		if is_local:
+			bare += "\n(you)"
+		return bare
+	var head: String = persona if not persona.is_empty() else "player_%d" % peer_id
+	var tag: String = "%s\n%d" % [head, steam_id]
+	if is_local:
+		tag += "\n(you)"
+	return tag
+
+
+## The live version of the two formatters above, for a peer in this session.
+func identity_for(peer_id: int) -> String:
+	var sid: int = peer_steam_id(peer_id)
+	return identity_text(peer_id, sid, persona_for(sid))
+
+
+func name_tag_for(peer_id: int) -> String:
+	var sid: int = peer_steam_id(peer_id)
+	return name_tag_text(peer_id, sid, persona_for(sid), peer_id == multiplayer.get_unique_id())
+
+#endregion
+
+
 ## Small convenience used by UI/debug code.
 func is_steam_available() -> bool:
 	return is_initialized

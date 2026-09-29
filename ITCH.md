@@ -315,3 +315,36 @@ auto-unzip it would not.
 Steps 1 and 2 are independent and can happen in either order — but do **not** put the page
 up publicly until step 5 has passed, because a broken first impression is expensive and
 this project's whole character so far has been to say what is actually true.
+
+## 0.0012 -- "the mac build says it is damaged" (FOUND AND FIXED)
+
+Reported by Mohamed: the macOS download "can't be read" on the M4 Mac mini. Root cause was **ours**,
+in `tools/release.sh`, and it affected every downloader:
+
+- Godot's macOS export template arrives **already signed** by Godot's own Developer ID
+  (`Authority=Developer ID Application: Prehensile Tales B.V. (6K46PWY5DM)`).
+- Release renames the inner binary and rewrites `Info.plist` with `plutil`. Either edit **invalidates**
+  that signature: the bundle still advertises one, but it no longer covers the bundle's contents.
+- A *broken* signature is not cosmetic. On a copy carrying the quarantine attribute (i.e. any real
+  download) macOS refuses it as **damaged**, and the usual right-click -> Open does not get past that.
+
+Proof, same machine, same minute -- the only difference is the build:
+
+    $ ditto -x -k SteamMMO_0.0011_macos.zip  && codesign --verify --deep --strict SteamMMO.app
+    0.0011: code has no resources but signature indicates they must be present   <-- broken
+    0.0012: valid on disk / satisfies its Designated Requirement                 <-- fixed
+    $ spctl -a -vv -t exec SteamMMO.app
+    0.0011: code has no resources but signature indicates they must be present
+    0.0012: rejected          (normal "unsigned by Apple", not "corrupt")
+
+(Note: extract with `ditto -x -k`, **not** `unzip`. Plain `unzip` does not restore bundle metadata and
+will make even a good bundle fail this check -- that false alarm cost time before it was spotted.)
+
+**The fix:** `release.sh` now runs `codesign --force --deep --sign - "$app"` after the rename and
+**fails the release** unless `codesign --verify --deep --strict` then passes. An ad-hoc signature is
+enough to make the bundle internally consistent; it is still not signed by an Apple developer, so the
+first launch is the ordinary "unidentified developer" prompt -- which right-click -> Open **does**
+clear. Only a paid notarization removes that prompt, and that is a human decision, not a code change.
+
+Verified on 0.0012 after pushing: served sha256 matches the ledger, the served zip extracts natively to
+an `-rwxr-xr-x` bundle whose signature is valid, and it boots `SteamMMO v0.0012 | netcode protocol 3`.

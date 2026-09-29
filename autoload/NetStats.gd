@@ -229,11 +229,10 @@ func _prune() -> void:
 			_logged_note.erase(peer_id)
 
 
+## Delegated, so the name tag, this report and the HUD all resolve a peer's account
+## the same way: one definition of "who is this peer on Steam" cannot drift.
 func _steam_id_for(peer_id: int) -> int:
-	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
-	if peer is SteamMultiplayerPeer:
-		return (peer as SteamMultiplayerPeer).get_steam_id_for_peer_id(peer_id)
-	return 0
+	return SteamManager.peer_steam_id(peer_id)
 
 
 ## Best-effort display name: what the peer published in the lobby, else Steam's

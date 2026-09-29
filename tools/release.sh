@@ -99,6 +99,35 @@ if [ -x "$MAC_GODOT" ]; then
 		plutil -replace CFBundleName -string SteamMMO "$app/Contents/Info.plist"
 	fi
 	cp "$appid_file" "$app/Contents/MacOS/steam_appid.txt"
+
+	# --- re-sign, or macOS calls the app "damaged" -----------------------------
+	# Godot's macOS export template ships already signed by Godot's own Developer ID
+	# ("Prehensile Tales B.V."), and the rename + plutil edits above INVALIDATE that
+	# signature: the bundle still claims one, but it no longer covers its contents.
+	# That is not a cosmetic complaint -- a broken signature makes macOS refuse the app
+	# outright ("SteamMMO.app is damaged and can't be opened"), which no amount of
+	# right-click -> Open gets past. Found 2026-09-28 after a real download was reported
+	# unreadable on an M4 Mac mini:
+	#     codesign --verify --deep --strict  ->  "code has no resources but signature
+	#                                            indicates they must be present"
+	#     spctl -a -vv                       ->  the same
+	# An ad-hoc signature ("--sign -") makes the bundle internally consistent again, and
+	# the check below FAILS THE RELEASE if it does not, because shipping an unopenable
+	# app is worse than shipping no app. Verified after signing:
+	#     valid on disk / satisfies its Designated Requirement
+	# It is still not signed by an Apple developer, so first launch is the ordinary
+	# "unidentified developer" prompt that right-click -> Open clears -- which is what
+	# the page text must say (see ITCH_PAGE.md).
+	codesign --force --deep --sign - "$app" >/dev/null 2>&1 || {
+		echo "!! could not ad-hoc sign $app" >&2
+		exit 1
+	}
+	codesign --verify --deep --strict "$app" || {
+		echo "!! $app does not verify after signing -- Gatekeeper would call it damaged" >&2
+		exit 1
+	}
+	echo "==> macOS bundle ad-hoc signed and verified (Gatekeeper-clean structure)"
+
 	mac_zip="$DIST_DIR/SteamMMO_${next}_macos.zip"
 	rm -f "$mac_zip"
 	# ditto, not zip: a .app is a bundle, and plain zip loses the metadata and the

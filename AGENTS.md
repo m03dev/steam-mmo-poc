@@ -312,3 +312,12 @@ The browser build is therefore **produced but not shippable** until a fix lands;
 (A: web-only shims, B: take Steam out of the parse path, C: drop the html5 channel) are
 weighed in `ITCH.md`. Fixing it still only buys a **single-player** browser demo — a browser
 cannot open a UDP socket, so no transport can ever work there.
+
+## macOS packaging: re-sign, always
+
+`tools/release.sh` **must** ad-hoc sign the macOS bundle (`codesign --force --deep --sign -`) after it
+renames the binary and rewrites `Info.plist`, and must fail if `codesign --verify --deep --strict`
+does not pass. Godot's export template ships signed by Godot's own Developer ID; our rename breaks
+that signature, and a broken signature makes macOS reject the app as **damaged** on any quarantined
+(i.e. downloaded) copy. 0.0011 shipped this way; 0.0012 fixed it. When checking a bundle, extract with
+`ditto -x -k` -- plain `unzip` loses bundle metadata and produces false failures.
