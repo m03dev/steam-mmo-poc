@@ -209,13 +209,20 @@ func _on_trigger_entered(body: Node3D) -> void:
 	if body is CharacterBody3D and multiplayer.multiplayer_peer != null \
 			and body.is_multiplayer_authority():
 		var target: String = NetworkManager.TYPE_DUNGEON if level_type == NetworkManager.TYPE_WORLD else NetworkManager.TYPE_WORLD
-		# A dungeon is a second session found through Steam's lobby list, so a direct
-		# (no-Steam) link cannot reach one. Say so in the log the player is already
-		# reading, and leave the trigger armed: if this session later becomes a Steam
-		# one, walking back in should still work.
-		if NetworkManager.is_direct_session():
-			WorldState.log_local("Dungeons need a Steam session -- direct-IP play is world-only.")
-			return
+		# A direct (no-Steam) link cannot reach a dungeon, because a dungeon is a second
+		# session found through Steam's lobby list. That refusal lives in NetworkManager
+		# with the rest of the transport knowledge, and says so in the log the player is
+		# already reading rather than failing silently here.
 		_transitioning = true
 		print("[Level] '%s' trigger hit -> transitioning to '%s'." % [level_type, target])
-		NetworkManager.transition_to_lobby_type(target)
+		# WHO travels is NetworkManager's decision now. This used to be local to each
+		# peer -- you moved when YOUR body touched the volume -- which quietly made a
+		# lie of the page's "the whole party travels together": one player walking in
+		# left the others standing in a world lobby the host had already abandoned.
+		# The host publishes the target in the lobby's data and a client asks the host
+		# through its own member data, so everyone moves (Steam lobby metadata, no new
+		# RPC, PROTOCOL unchanged).
+		if not NetworkManager.request_party_transition(target):
+			# Nothing to travel to (no Steam at all). Leave the trigger armed, so a
+			# session that becomes a Steam one later can still use it.
+			_transitioning = false

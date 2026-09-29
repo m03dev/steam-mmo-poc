@@ -82,6 +82,50 @@ const RESULT_OK: int = 1
 const TYPE_WORLD: String = "world"
 const TYPE_DUNGEON: String = "dungeon"
 
+## Party travel, carried on Steam's lobby metadata rather than on the RPC layer.
+##
+## The itch page promises that stepping into the trigger takes the WHOLE party with
+## you, and until now it did not: scripts/level.gd only ever reacted to the local
+## avatar, so each player travelled when their OWN body touched the volume and the
+## others were left behind in a lobby the first player had already abandoned.
+##
+## Fixing it through lobby data instead of a new @rpc is deliberate. An @rpc would
+## bump PROTOCOL_VERSION and split the playerbase exactly when strangers are being
+## asked to download a build; lobby data is already replicated to every member by
+## Steam, needs no wire change, and each half is a permission Steam grants by itself:
+## the HOST may write lobby data, and any CLIENT may write its own member data, which
+## the host watches.
+##
+## NOTE for anyone extending this: GodotSteam 4.22.1's `lobby_data_update` signal
+## carries only (success, lobby_id, member_id) -- no key, no value. The value is
+## therefore READ BACK from Steam when the event arrives, and `member_id == 0` is the
+## marker for a lobby-data change (anything else is that member's own row).
+const KEY_TRANSITION: String = "transition_to"
+const KEY_TRANSITION_REQUEST: String = "request_transition"
+
+## What a peer does when its own avatar steps into the trigger.
+##
+## A pure function of three flags on purpose: this is the decision the page's promise
+## rests on, so it is pinned by a unit test with no Steam, no peer and no lobby.
+enum TransitionMove {
+	## We own the lobby: publish the target and travel.
+	BROADCAST,
+	## We are a client: ask the owner through our own member data and wait to follow.
+	REQUEST,
+	## Direct-IP session: one host, one port, no lobby list to travel through.
+	REFUSE_DIRECT,
+	## No session at all: there is nothing to travel to.
+	REFUSE_OFFLINE,
+}
+
+
+static func transition_move(is_direct: bool, is_host: bool, in_lobby: bool) -> TransitionMove:
+	if is_direct:
+		return TransitionMove.REFUSE_DIRECT
+	if not in_lobby:
+		return TransitionMove.REFUSE_OFFLINE
+	return TransitionMove.BROADCAST if is_host else TransitionMove.REQUEST
+
 ## Which lobby visibility a session is created with. Friends-only is the right
 ## default for a build handed to other people: a public Spacewar lobby is listed to
 ## every Steam user, and this game's sessions are meant to be found by invite, not
@@ -146,6 +190,12 @@ var steam_debug_level: int = 0
 var _pending_create_type: String = ""
 var _pending_autojoin_type: String = ""
 
+## Set the moment a party transition begins, on EVERY peer that travels, and cleared
+## by leave_lobby(). It exists because the same announcement reaches us twice on the
+## host -- we publish it AND Steam reports the change back -- and because a client's
+## request can arrive while its own transition is already under way.
+var _party_transition_started: bool = false
+
 ## How many times to re-check the lobby list before giving up and hosting. Stops
 ## two peers launched at the same instant from each seeing an empty list and
 ## hosting two separate lobbies they can never meet in.
@@ -174,6 +224,9 @@ func _ready() -> void:
 		Steam.lobby_created.connect(_on_steam_lobby_created)
 		Steam.lobby_joined.connect(_on_steam_lobby_joined)
 		Steam.lobby_match_list.connect(_on_steam_lobby_match_list)
+		# Party travel rides on lobby metadata, so the host's announcement reaches
+		# every member as this callback (see KEY_TRANSITION).
+		Steam.lobby_data_update.connect(_on_steam_lobby_data_update)
 		# "Join Game" in a friend's Steam client, and invites arriving while we run:
 		# both mean "come here", and both carry the lobby id to go to.
 		Steam.join_requested.connect(_on_steam_join_requested)
@@ -295,6 +348,9 @@ func leave_lobby() -> void:
 	current_lobby_type = ""
 	_direct_session = false
 	is_host = false
+	# The old session is gone, so a transition that was under way is over: whatever
+	# comes next (the rejoin that completes it, or a fresh session) starts fresh.
+	_party_transition_started = false
 	_clear_presence()
 	if was_in_lobby:
 		lobby_left.emit()
@@ -321,6 +377,100 @@ func transition_to_lobby_type(new_type: String) -> void:
 	print("[NetworkManager] Transition '%s' -> '%s'." % [current_lobby_type, new_type])
 	leave_lobby()
 	auto_join_first_open(new_type)
+
+
+#region Party travel -------------------------------------------------------------
+#
+# Entry point for "someone walked into the trigger": one call that every peer can
+# make, whether it owns the session or not, and which the page's "the whole party
+# travels together" claim now rests on. The mechanism is Steam lobby metadata, so
+# nothing here changes the wire format and PROTOCOL_VERSION stays put.
+
+## Move the whole party to `new_type`. Returns true when travel is under way, which
+## lets level.gd decide whether to disarm its trigger: a refusal leaves it armed,
+## because a session that is not on Steam today may be on Steam later.
+func request_party_transition(new_type: String) -> bool:
+	match transition_move(_direct_session, is_host, current_lobby_id != 0):
+		TransitionMove.BROADCAST:
+			return _publish_party_transition(new_type)
+		TransitionMove.REQUEST:
+			return _ask_host_for_transition(new_type)
+		TransitionMove.REFUSE_DIRECT:
+			WorldState.log_local("Dungeons need a Steam session -- direct-IP play is world-only.")
+			return false
+		TransitionMove.REFUSE_OFFLINE:
+			WorldState.log_local("Nothing to travel to: this session is not on Steam.")
+			return false
+	return false
+
+
+## Host side: write the target into the lobby's own data and travel. Every other
+## member sees it through Steam and follows; the host's own copy of that update
+## arrives too, and `_party_transition_started` makes that second delivery a no-op.
+func _publish_party_transition(new_type: String) -> bool:
+	if current_lobby_id == 0:
+		return false
+	if Steam.getLobbyOwner(current_lobby_id) != SteamManager.steam_id:
+		# Ownership can move: Steam hands the lobby to another member if the owner
+		# leaves. Writing data we do not own would be silently ignored, so ask instead.
+		push_warning("[NetworkManager] Not the lobby owner; asking for the transition instead.")
+		return _ask_host_for_transition(new_type)
+	if not Steam.setLobbyData(current_lobby_id, KEY_TRANSITION, new_type):
+		push_warning("[NetworkManager] Steam refused to publish the transition in lobby %d."
+				% current_lobby_id)
+		return false
+	print("[NetworkManager] Party transition -> '%s' published in lobby %d." % [
+			new_type, current_lobby_id])
+	_begin_transition(new_type)
+	return true
+
+
+## Client side: a client may not write lobby data, so it writes its OWN row and the
+## host reads it. Deliberately does NOT travel locally: moving on our own would find
+## or create a DIFFERENT lobby from the host's -- splitting the party, which is the
+## exact bug this change exists to remove. We wait for the host's announcement.
+func _ask_host_for_transition(new_type: String) -> bool:
+	if current_lobby_id == 0:
+		return false
+	Steam.setLobbyMemberData(current_lobby_id, KEY_TRANSITION_REQUEST, new_type)
+	print("[NetworkManager] Asked the host to move the party to '%s' (member data on lobby %d)." % [
+			new_type, current_lobby_id])
+	return true
+
+
+func _begin_transition(new_type: String) -> void:
+	if _party_transition_started:
+		return
+	_party_transition_started = true
+	transition_to_lobby_type(new_type)
+
+
+## Steam reported that lobby metadata changed. This build's signal carries no key and
+## no value, so the value is read back: `member_id == 0` is the lobby's own data (the
+## host's announcement, which every member must act on) and anything else identifies
+## the member whose row changed (a client's request, which only the host acts on).
+func _on_steam_lobby_data_update(success: bool, lobby_id: int, member_id: int) -> void:
+	# A stale callback for a lobby we have already left (or none at all) must not
+	# reach Steam: asking about lobby 0 is an error, and the session it belonged to is
+	# over anyway.
+	if not success or lobby_id == 0 or lobby_id != current_lobby_id or _party_transition_started:
+		return
+	if member_id == 0:
+		var announced: String = Steam.getLobbyData(lobby_id, KEY_TRANSITION)
+		if announced.is_empty():
+			return
+		print("[NetworkManager] The host moved the party to '%s'." % announced)
+		_begin_transition(announced)
+		return
+	if not is_host:
+		return
+	var requested: String = Steam.getLobbyMemberData(lobby_id, member_id, KEY_TRANSITION_REQUEST)
+	if requested.is_empty():
+		return
+	print("[NetworkManager] Member %d asked to move the party to '%s'." % [member_id, requested])
+	_publish_party_transition(requested)
+
+#endregion
 
 
 ## Number of players currently in our lobby (0 if not in one).

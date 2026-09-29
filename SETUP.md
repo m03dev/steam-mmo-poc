@@ -70,7 +70,13 @@ The real game, not a harness - two processes, no lobby, no Steam account needed:
 
 Both load `res://scenes/Main.tscn`; the host spawns `player_1` and
 `player_<client id>` and each side sees both. A second instance on the same
-machine needs `--direct-port=23461` to avoid fighting over the port.
+port is SHARED, not per-instance: those two commands need no flag at all,
+because both use the default 23460 and the client dials the HOST's port. Only a
+second, INDEPENDENT session on one machine needs a port of its own (a second host
+with `--direct-port=23461`) -- and then only ITS clients pass 23461. Handing the
+client above a different port from its host is the one way to make this fail
+silently: it dials a port nothing is listening on. Confirmed live on 2026-09-29
+after a report from the Windows side.
 
 `res://tests/two_peer_harness.tscn` remains for a narrower, scripted ENet pair on
 port 23457 (`-- --host` / `-- --client`); it exercises replication, the per-peer

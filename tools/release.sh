@@ -12,6 +12,18 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GODOT="${GODOT:-/Applications/Godot_mono.app/Contents/MacOS/Godot}"
+# The engine that exports the WINDOWS build must be the same KIND of engine as the
+# macOS and Web builds ship, or one channel of a release is a .NET build and the
+# others are not. The .NET ("mono") editor writes a .NET engine template, which
+# carries a hostfxr/CoreCLR load path that a stranger's machine may not satisfy;
+# the standard editor writes a plain engine. 0.0011 shipped this way -- the Windows
+# channel noticed the version string read "mono" -- so the check after the export
+# below makes it impossible to do again.
+WIN_GODOT="${WIN_GODOT:-$HOME/Applications/Godot.app/Contents/MacOS/Godot}"
+if [ ! -x "$WIN_GODOT" ]; then
+	echo "!! no standard (non-.NET) editor at $WIN_GODOT - falling back to $GODOT" >&2
+	WIN_GODOT="$GODOT"
+fi
 PRESET="${PRESET:-Windows Desktop}"
 BUILD_DIR="$PROJECT_DIR/build"
 DIST_DIR="$PROJECT_DIR/dist"
@@ -44,7 +56,16 @@ echo "==> GAME_VERSION in NetworkManager.gd set to $next"
 
 # --- build ---------------------------------------------------------------------
 echo "==> exporting '$PRESET'"
-"$GODOT" --headless --path "$PROJECT_DIR" --export-release "$PRESET" "$BUILD_DIR/SteamMMO.exe" >/dev/null
+"$WIN_GODOT" --headless --path "$PROJECT_DIR" --export-release "$PRESET" "$BUILD_DIR/SteamMMO.exe" >/dev/null
+
+# Verify the engine KIND, not just that a file appeared: the mono editor produces a
+# .NET template silently, and nothing else in this script would ever notice.
+if strings -a "$BUILD_DIR/SteamMMO.exe" | grep -qE "hostfxr|CoreCLR"; then
+	echo "!! $BUILD_DIR/SteamMMO.exe is a .NET engine build, but $WIN_GODOT was supposed to write a plain one" >&2
+	echo "   (a .NET template needs a runtime a stranger's Windows box may not have)" >&2
+	exit 1
+fi
+echo "==> Windows engine verified plain, no .NET dependency (built by $(basename "$(dirname "$(dirname "$WIN_GODOT")")"))"
 
 # --- Steam App ID --------------------------------------------------------------
 # The build runs as the App ID in steam_appid.txt, and SteamManager reads the copy

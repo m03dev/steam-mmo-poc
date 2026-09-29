@@ -82,8 +82,9 @@ routed by SteamID, so two instances of the same account collide).
   loop, mobs and quests included.
 - **Multiplayer without Steam:** one player presses *Host Direct* (it shows the port it opened),
   the other types that machine's address into *Join Direct*. On one machine, or for testing,
-  two instances can run at once — the second needs `--direct-port=23461` so they do not fight
-  over the port:
+  the port is SHARED by the session, so a client must dial the host's port — the pair below
+  needs no flag at all. `--direct-port=N` is for a second, INDEPENDENT session on one machine
+  (a second host on 23461), and then only its own clients pass it:
 
   ```bash
   Godot --path . -- --host-direct
