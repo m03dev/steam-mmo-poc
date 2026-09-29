@@ -174,7 +174,19 @@ not a zip.)
 **The macOS download WILL be quarantined by Gatekeeper.** The app is unsigned, so a copy that
 arrives over the internet gets flagged: testers see *"cannot be opened because the developer
 cannot be verified"* or even *"it is damaged"*. Neither means the build is broken — it means
-macOS does not know the author. They can right-click -> **Open** (once), or run
+macOS does not know the author.
+
+**CORRECTED in 0.0014, from watching it happen.** On current macOS the dialog for a
+non-notarized app offers only **Move to Trash** and **Done**, so right-click -> Open does NOT
+get past it - which is what this file and ITCH_PAGE.md used to tell players to do. The route
+that works: drag the app out of Downloads first (macOS otherwise translocates it to a random
+read-only path), click **Done**, then System Settings -> Privacy & Security -> **Open Anyway**.
+One-command alternative: `xattr -dr com.apple.quarantine /Applications/SteamMMO.app`.
+
+Verified on the SERVED 0.0014 zip fetched back from itch and quarantined as Safari would leave
+it: `codesign --verify --deep --strict` is clean, the bundle is byte-identical to `dist/`
+(including the executable's sha256), and the same bytes boot `SteamMMO v0.0014 | netcode
+protocol 3`. They can right-click -> **Open** (once), or run
 `xattr -dr com.apple.quarantine SteamMMO.app`. **Put this on the page**, or friends will report
 the Mac build as broken and be right to.
 
