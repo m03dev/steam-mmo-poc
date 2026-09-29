@@ -321,3 +321,27 @@ does not pass. Godot's export template ships signed by Godot's own Developer ID;
 that signature, and a broken signature makes macOS reject the app as **damaged** on any quarantined
 (i.e. downloaded) copy. 0.0011 shipped this way; 0.0012 fixed it. When checking a bundle, extract with
 `ditto -x -k` -- plain `unzip` loses bundle metadata and produces false failures.
+
+
+## The two-agent channel, and the watcher that keeps it warm
+
+Castor (this Mac) and Pollux (the Windows box) coordinate through one shared Drive folder:
+`My Drive/agent-comms/`. Nothing there notifies anyone by itself, which has twice cost a
+whole session to one side sitting idle after the other had already answered.
+
+    tools/drive_watch.sh start      # background poll every 30 s; survives the shell
+    tools/drive_watch.sh digest     # everything noticed since the last `clear` -- READ THIS FIRST
+    tools/drive_watch.sh clear      # after reading it
+    tools/drive_watch.sh say "..."  # post to messages/from-castor.md, timestamped
+
+It writes `dist/drive_watch/INBOX.md` (the digest), `watch.log`, and a
+`HEARTBEAT-castor.md` in the shared folder so Pollux can see this machine is alive.
+
+**Its honest limit:** it cannot wake an agent. Agents run only when a human speaks, so the
+watcher makes the *waiting* visible - a notification, a log line, a one-command digest -
+and the human or the next turn does the talking. Never let a script imply a live reply that
+did not happen.
+
+`HEARTBEAT-<agent>.md` is watched by nobody, on purpose: watching it would make each side's
+heartbeat look like news, and two watchers would ping-pong forever. Never put anything in a
+heartbeat you need read.

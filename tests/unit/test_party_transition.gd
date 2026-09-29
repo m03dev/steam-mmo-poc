@@ -135,7 +135,7 @@ func test_the_flag_that_guards_it_is_set_before_the_trip_not_after() -> void:
 	var source: String = FileAccess.get_file_as_string("res://autoload/NetworkManager.gd")
 	var fn_start: int = source.find("func _begin_transition(")
 	assert_gt(fn_start, 0, "_begin_transition must exist")
-	var body: String = source.substr(fn_start, 400)
+	var body: String = source.substr(fn_start, 2000)
 	var set_at: int = body.find("_party_transition_started = true")
 	var call_at: int = body.find("transition_to_lobby_type(")
 	assert_gt(set_at, 0, "the trip must be flagged")
@@ -143,6 +143,33 @@ func test_the_flag_that_guards_it_is_set_before_the_trip_not_after() -> void:
 	assert_lt(set_at, call_at,
 			"the flag is raised BEFORE the trip starts, or the callback that returns "
 			+ "mid-flight would start a second one")
+	assert_lt(set_at, body.find("ANNOUNCE_GRACE"),
+			"and before the host's grace period, or a second caller could slip into the wait")
+
+
+#region The host's announcement must actually land --------------------------------
+
+func test_a_solo_host_does_not_wait_for_anyone() -> void:
+	# Nobody to tell, nothing to wait for: a lone host travels at once.
+	assert_false(NetworkManager.needs_announce_grace(true, 1))
+
+
+func test_a_host_with_company_lets_the_announcement_land() -> void:
+	# The host OWNS the lobby, so leaving destroys it. Without this beat the data update
+	# can race the teardown, and losing that race is silent: the client simply never
+	# travels, and the failure looks like "party travel does not work".
+	assert_true(NetworkManager.needs_announce_grace(true, 2))
+	assert_true(NetworkManager.needs_announce_grace(true, 8))
+
+
+func test_only_a_host_ever_waits() -> void:
+	# A client destroys no lobby by leaving, so waiting would only be a delay.
+	assert_false(NetworkManager.needs_announce_grace(false, 4))
+
+
+func test_the_wait_is_long_enough_to_be_worth_taking() -> void:
+	assert_gt(NetworkManager.ANNOUNCE_GRACE, 0.5,
+			"a grace period shorter than a Steam round trip is just a slower race")
 
 
 #endregion

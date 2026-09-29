@@ -65,7 +65,7 @@ if strings -a "$BUILD_DIR/SteamMMO.exe" | grep -qE "hostfxr|CoreCLR"; then
 	echo "   (a .NET template needs a runtime a stranger's Windows box may not have)" >&2
 	exit 1
 fi
-echo "==> Windows engine verified plain, no .NET dependency (built by $(basename "$(dirname "$(dirname "$WIN_GODOT")")"))"
+echo "==> Windows engine verified plain, no .NET dependency (built by $(basename "$(dirname "$(dirname "$(dirname "$(dirname "$WIN_GODOT")")")")"))")"
 
 # --- Steam App ID --------------------------------------------------------------
 # The build runs as the App ID in steam_appid.txt, and SteamManager reads the copy

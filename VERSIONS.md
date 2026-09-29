@@ -79,3 +79,10 @@ different size, and that is the quickest way to catch it.
 - `SteamMMO_0.0012_macos.zip` -- 66473082 bytes -- sha256 `32b85ab74ca8828216ede80005b1dc416ad58a8e093a3d170c83666567652f4a` (macOS)
 - `build/web/` --  45M -- Web/HTML5, built from the same tree
 
+## 0.0013 -- 2026-09-28 18:59
+
+- party travel: the trigger now moves everyone (Steam lobby data, PROTOCOL stays 3) + Windows exported from the plain, non-.NET engine
+- `SteamMMO_0.0013.zip` -- 44719640 bytes -- sha256 `fc7c4991f363d90e87721ff235e41e91b91eac3b6ee708b582a2fc865139291f` (Windows)
+- `SteamMMO_0.0013_macos.zip` -- 66565628 bytes -- sha256 `47418d240ab125a35ee3d72ead7691657ad91f954fdbb30eb55b72433840b012` (macOS)
+- `build/web/` --  46M -- Web/HTML5, built from the same tree
+

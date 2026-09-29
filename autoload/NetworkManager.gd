@@ -43,7 +43,7 @@ const KEY_PROTOCOL: String = "protocol"
 ## It is baked in as a const on purpose: res://VERSION is a loose text file that may
 ## not be packed into an exported build, whereas a const always is. Published in the
 ## lobby and in each member's own data, so both sides can read what they are talking to.
-const GAME_VERSION: String = "0.0012"
+const GAME_VERSION: String = "0.0013"
 
 ## Wire-protocol revision. Bump this when - and only when - the set of @rpc methods
 ## or their signatures changes. Two builds with the same protocol talk to each other
@@ -438,10 +438,30 @@ func _ask_host_for_transition(new_type: String) -> bool:
 	return true
 
 
+## How long a host keeps the doomed lobby alive so its announcement can reach everyone.
+## The host is the lobby's OWNER: leaving destroys the lobby, and Steam still has to
+## deliver that one data update to every member first. Publishing and tearing down in the
+## same frame is a race a client can lose -- and losing it is SILENT, the client simply
+## never travels and stays behind in a lobby nobody is in. A second of the host's time is
+## a cheap price for an announcement that always lands.
+const ANNOUNCE_GRACE: float = 1.2
+
+
+## Whether this peer must let the announcement settle before travelling: only a HOST has
+## a lobby to destroy, and only a host with someone else in it has anyone to tell.
+static func needs_announce_grace(is_host_session: bool, member_count: int) -> bool:
+	return is_host_session and member_count > 1
+
+
 func _begin_transition(new_type: String) -> void:
 	if _party_transition_started:
 		return
 	_party_transition_started = true
+	var members: int = Steam.getNumLobbyMembers(current_lobby_id) if current_lobby_id != 0 else 0
+	if needs_announce_grace(is_host, members):
+		print("[NetworkManager] Holding lobby %d open %.1fs so %d member(s) see the move." % [
+				current_lobby_id, ANNOUNCE_GRACE, members - 1])
+		await get_tree().create_timer(ANNOUNCE_GRACE).timeout
 	transition_to_lobby_type(new_type)
 
 
