@@ -10,7 +10,7 @@ with Godot's high-level multiplayer. Host-authoritative, no dedicated server.
 | --- | --- |
 | **Source** | <https://github.com/m03dev/steam-mmo-poc> — public, `main` branch |
 | **Steam** | **not published.** A Steam release needs its own App ID, which needs a Steamworks partner account — see `STEAM_RELEASE.md` |
-| **itch.io** | **not published.** Needs the owner's itch account and API key; see *Publishing* below |
+| **itch.io** | **LIVE** — <https://mo3dev.itch.io/testing> (Windows + macOS, version 0.0011). The page still needs its description, screenshots and Gatekeeper note pasted in; see `ITCH_PAGE.md` |
 | **Version** | `0.0009`, netcode protocol `3` |
 
 **The one blocker, stated plainly:** the game talks to Steam App ID `480` (Spacewar), Valve's

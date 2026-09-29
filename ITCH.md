@@ -60,6 +60,43 @@ format. (Protocol stays 3.)
 the Steam build. Browser build is a single-player preview." Never quietly ship a build that
 silently cannot find other players — the friends-only lobby trap already taught that lesson.
 
+## IT IS LIVE (2026-09-28) -- and verified end to end, not just uploaded
+
+**<https://mo3dev.itch.io/testing>** -- public, **HTTP 200**, and the page lists
+`SteamMMO_0.0011.zip`, `SteamMMO_0.0011_macos.zip` and version **0.0011** with download buttons.
+
+The verification that matters -- **fetched back from itch and compared**, because an upload that
+"succeeded" is not the same as an artefact that arrived:
+
+| Check | Result |
+| --- | --- |
+| `butler fetch mo3dev/testing:windows` -> sha256 | `40d2fdf8…` == `VERSIONS.md` **MATCH** |
+| `butler fetch mo3dev/testing:osx` -> sha256 | `3d11a3ae…` == `VERSIONS.md` **MATCH** |
+| each channel serves | **1 file, 0 dirs** -- the zip as a blob, so butler did not unpack it |
+| `unzip -Z` of the served macOS zip | `-rwxr-xr-x … Contents/MacOS/SteamMMO` -- the executable bit survived |
+| the **served** macOS bundle, extracted and run | boots: `SteamMMO v0.0011`, protocol 3, exit 0 |
+
+Two builds of 0.0011 exist per channel: #2033335/#2033336 and then #2033339/#2033340 from this
+machine's push. butler reported **"Re-used 100.00% of old, added 0 B fresh data"**, which is itself
+proof that both pushes carried identical bytes -- the two agents independently put the same
+artefacts on the same channels.
+
+### What the live page still lacks (all of it is Mohamed's, and none is code)
+
+1. **The page is called "testing"** and has no description. The paste-ready text is `ITCH_PAGE.md`.
+   Recommended before sharing the link: rename the title to *Steam MMO POC* and change the URL slug
+   to `steam-mmo-poc` (nothing links to the old one yet).
+2. **No screenshots.** Four real ones are in `agent-comms/itch-assets/` (`02_open_world.png` is the
+   cover at 630x500).
+3. **No Gatekeeper note**, so a Mac downloader will report a working build as broken. The line is in
+   `ITCH_PAGE.md` under *System requirements*.
+
+### The one thing still unverified
+
+**No Windows machine has ever run 0.0011.** The zip is structurally complete (`SteamMMO.exe`,
+`SteamMMO.pck`, both Steam DLLs, `steam_appid.txt`, matching exe/pck names) and the macOS sibling
+boots, but "should work" is not "does". Pollux's clean-machine test is the only instrument for it.
+
 ## What Mohamed has to do now -- two minutes, and only he can
 
 Good news first: **the page already exists.** Pollux created it and pushed both channels from
