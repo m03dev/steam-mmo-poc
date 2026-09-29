@@ -54,7 +54,7 @@ const KEY_PROTOCOL: String = "protocol"
 ## It is baked in as a const on purpose: res://VERSION is a loose text file that may
 ## not be packed into an exported build, whereas a const always is. Published in the
 ## lobby and in each member's own data, so both sides can read what they are talking to.
-const GAME_VERSION: String = "0.0017"
+const GAME_VERSION: String = "0.0018"
 
 ## Wire-protocol revision. Bump this when - and only when - the set of @rpc methods
 ## or their signatures changes. Two builds with the same protocol talk to each other

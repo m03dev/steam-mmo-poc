@@ -116,3 +116,10 @@ different size, and that is the quickest way to catch it.
 - `SteamMMO_0.0017_macos.zip` -- 67457867 bytes -- sha256 `e39d2f984a25576f49c17c12accc91ab685dc47793d14bd5f89cfc988aecd8da` (macOS)
 - `build/web/` --  46M -- Web/HTML5, built from the same tree
 
+## 0.0018 -- 2026-09-29 00:31
+
+- Minimal menu: PLAY, Play Offline and the open-world list - nothing else
+- `SteamMMO_0.0018.zip` -- 45613968 bytes -- sha256 `811324a652048fb8a25e0ae5877ec8911fc9d1a097b30841744d9fe153b7882c` (Windows)
+- `SteamMMO_0.0018_macos.zip` -- 67455961 bytes -- sha256 `aa323c31f2447169f69eaab91b59b1593ef9c405c6a99a5813c0b86b237ab6b8` (macOS)
+- `build/web/` --  46M -- Web/HTML5, built from the same tree
+
