@@ -36,18 +36,6 @@ theme_override_font_sizes/font_size = 30
 text = "STEAM MMO POC"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="Center/Panel/VBox"]
-theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
-theme_override_font_sizes/font_size = 12
-text = "Godot 4  |  Steam SDR relay  |  host-authoritative  |  world + dungeon"
-horizontal_alignment = 1
-
-[node name="Identity" type="Label" parent="Center/Panel/VBox"]
-unique_name_in_owner = true
-theme_override_font_sizes/font_size = 13
-text = "Steam: -"
-horizontal_alignment = 1
-
 [node name="SteamBanner" type="PanelContainer" parent="Center/Panel/VBox"]
 unique_name_in_owner = true
 visible = false
@@ -83,45 +71,13 @@ custom_minimum_size = Vector2(0, 48)
 theme_override_font_sizes/font_size = 22
 text = "PLAY"
 
-[node name="PlayRow1" type="HBoxContainer" parent="Center/Panel/VBox"]
+[node name="OfflineRow" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 8
 
-[node name="HostWorldButton" type="Button" parent="Center/Panel/VBox/PlayRow1"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(272, 0)
-text = "Host New World"
-
-[node name="HostDungeonButton" type="Button" parent="Center/Panel/VBox/PlayRow1"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(272, 0)
-text = "Host Dungeon"
-
-[node name="PlayRow2" type="HBoxContainer" parent="Center/Panel/VBox"]
-theme_override_constants/separation = 8
-
-[node name="AutoDungeonButton" type="Button" parent="Center/Panel/VBox/PlayRow2"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(272, 0)
-text = "Auto-Join Dungeon"
-
-[node name="OfflineButton" type="Button" parent="Center/Panel/VBox/PlayRow2"]
+[node name="OfflineButton" type="Button" parent="Center/Panel/VBox/OfflineRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(272, 0)
 text = "Play Offline (no Steam)"
-
-[node name="JoinRow" type="HBoxContainer" parent="Center/Panel/VBox"]
-theme_override_constants/separation = 8
-
-[node name="LobbyIdInput" type="LineEdit" parent="Center/Panel/VBox/JoinRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(384, 0)
-placeholder_text = "Lobby ID to join"
-caret_blink = true
-
-[node name="JoinButton" type="Button" parent="Center/Panel/VBox/JoinRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 34)
-text = "Join Lobby"
 
 [node name="LobbyListPanel" type="PanelContainer" parent="Center/Panel/VBox"]
 
@@ -157,28 +113,6 @@ theme_override_font_sizes/font_size = 11
 text = "Looking for open worlds..."
 autowrap_mode = 3
 
-[node name="DirectHostRow" type="HBoxContainer" parent="Center/Panel/VBox"]
-theme_override_constants/separation = 8
-
-[node name="DirectHostButton" type="Button" parent="Center/Panel/VBox/DirectHostRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 0)
-text = "Host Direct (IP, no Steam)"
-
-[node name="DirectRow" type="HBoxContainer" parent="Center/Panel/VBox"]
-theme_override_constants/separation = 8
-
-[node name="DirectAddressInput" type="LineEdit" parent="Center/Panel/VBox/DirectRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(384, 0)
-placeholder_text = "Host IP to join (blank = this machine)"
-caret_blink = true
-
-[node name="DirectJoinButton" type="Button" parent="Center/Panel/VBox/DirectRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 34)
-text = "Join Direct"
-
 [node name="Status" type="Label" parent="Center/Panel/VBox"]
 unique_name_in_owner = true
 theme_override_colors/font_color = Color(0.607843, 0.811765, 0.964706, 1)
@@ -195,10 +129,3 @@ theme_override_constants/separation = 8
 unique_name_in_owner = true
 custom_minimum_size = Vector2(560, 0)
 text = "Quit"
-
-[node name="Controls" type="Label" parent="Center/Panel/VBox"]
-theme_override_colors/font_color = Color(0.423529, 0.494118, 0.576471, 1)
-theme_override_font_sizes/font_size = 11
-text = "WASD move   ·   Space jump   ·   Shift run   ·   Mouse look   ·   Ctrl/Esc cursor   ·   Wheel zoom   ·   F3 dev hud"
-horizontal_alignment = 1
-autowrap_mode = 3

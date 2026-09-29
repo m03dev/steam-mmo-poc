@@ -11,11 +11,7 @@ const GAME_SCENE: String = "res://scenes/Main.tscn"
 # static function and calling it on an instance is a warning.
 const STEAM_MANAGER := preload("res://autoload/SteamManager.gd")
 
-@onready var _identity: Label = %Identity
 @onready var _status: Label = %Status
-@onready var _lobby_id_input: LineEdit = %LobbyIdInput
-@onready var _join_button: Button = %JoinButton
-@onready var _direct_address_input: LineEdit = %DirectAddressInput
 @onready var _steam_banner: PanelContainer = %SteamBanner
 @onready var _steam_problem: Label = %SteamProblem
 @onready var _lobby_list_box: VBoxContainer = %LobbyListBox
@@ -33,12 +29,6 @@ var _launch_action: String = ""
 
 func _ready() -> void:
 	%PlayButton.pressed.connect(_play)
-	%HostWorldButton.pressed.connect(_host.bind(NetworkManager.TYPE_WORLD))
-	%HostDungeonButton.pressed.connect(_host.bind(NetworkManager.TYPE_DUNGEON))
-	%AutoDungeonButton.pressed.connect(_auto_join.bind(NetworkManager.TYPE_DUNGEON))
-	_join_button.pressed.connect(_on_join_pressed)
-	%DirectHostButton.pressed.connect(_host_direct)
-	%DirectJoinButton.pressed.connect(_join_direct)
 	%OfflineButton.pressed.connect(_enter_game)
 	%QuitButton.pressed.connect(get_tree().quit)
 	# The two ways out of a failed Steam start, both live from the menu: open the client the
@@ -71,7 +61,6 @@ func _ready() -> void:
 	_lobby_timer.start()
 
 	_launch_action = _read_launch_action()
-	_refresh_identity()
 	# SteamManager is an autoload, so it may already have resolved before this
 	# scene ran; apply the current state rather than waiting for a signal.
 	_on_steam_initialized(SteamManager.is_initialized)
@@ -137,22 +126,13 @@ func _host(lobby_type: String) -> void:
 	NetworkManager.create_lobby(lobby_type)
 
 
-func _auto_join(lobby_type: String) -> void:
-	if not _steam_ready():
-		return
-	_set_status("Looking for an open '%s' lobby..." % lobby_type)
-	NetworkManager.auto_join_first_open(lobby_type)
-
-
-func _on_join_pressed() -> void:
-	if not _steam_ready():
-		return
-	var text: String = _lobby_id_input.text.strip_edges()
-	if not text.is_valid_int():
-		_set_status("Enter a numeric Lobby ID first.")
-		return
-	_set_status("Joining lobby %s..." % text)
-	NetworkManager.join_lobby(int(text))
+## There is deliberately NO override row any more: no Host New World, no Host Dungeon, no
+## auto-join-a-dungeon, no join-by-lobby-id, no direct-IP fields. Mohamed's words were "all of that
+## shouldn't be there, make it simple and minimal, get rid of the auto join dungeon". PLAY is
+## join-or-host, which is the only decision a player actually has to make, and the open-world list
+## is the only other one. The removed paths stay reachable from the command line for testing
+## (--host-world, --host-dungeon, --host-direct, --join-direct=<address>), which is where they
+## belong: they are for us, not for someone's first run.
 
 
 ## Whether a Steam-backed action can run, and the whole point of the fix.
@@ -183,11 +163,9 @@ func _host_direct() -> void:
 	NetworkManager.host_direct()
 
 
-## Join by IP. Accepts "host", "host:port", or a bare IPv4 address.
-func _join_direct() -> void:
-	_join_direct_to(_direct_address_input.text)
-
-
+## Join by IP, from the command line only ("host", "host:port", or a bare IPv4 address). There is no
+## address field on the menu any more, but the transport stays reachable for testing a LAN without
+## Steam - which is the whole reason it exists.
 func _join_direct_to(spec: String) -> void:
 	var parsed: Dictionary = NetworkManager.parse_direct_address(spec, NetworkManager.direct_port)
 	var address: String = str(parsed["address"])
@@ -372,29 +350,21 @@ static func lobby_list_status_text(count: int, steam_ready: bool, joinable: int 
 
 
 func _on_steam_initialized(success: bool) -> void:
-	# Direct-IP sessions are NOT gated on Steam -- they exist for people who have no Steam at all.
-	# They are gated on the platform instead: a browser cannot open a raw UDP socket, so ENet
-	# cannot exist in a web build, and offering it there would be a button that can never work.
+	# NO button is ever disabled here, on any branch. A disabled button cannot explain itself, and
+	# the reason Steam is unavailable is the one thing the player needs to know: the buttons stay
+	# pressable and answer through _steam_ready() with the real cause and the way out.
+	#
+	# Direct-IP play still runs without Steam from the command line, so this is not a gate on the
+	# transport - the menu simply stops OFFERING it. Mohamed: "make it simple and minimal".
 	var web_build: bool = OS.has_feature("web")
-	%DirectHostButton.disabled = web_build
-	%DirectJoinButton.disabled = web_build
-	_direct_address_input.editable = not web_build
-
-	# Every Steam-backed button STAYS ENABLED either way. A disabled button cannot explain
-	# itself, and the reason Steam is unavailable is the one thing the player needs to know.
-	for button: Button in [%PlayButton, %HostWorldButton, %HostDungeonButton,
-			%AutoDungeonButton, _join_button]:
-		button.disabled = false
-	_lobby_id_input.editable = true
 
 	if success:
 		_steam_banner.visible = false
 	else:
 		_show_steam_banner()
-
 	if web_build:
-		_set_status("Browser build: single-player only (Play Offline). Steam and "
-				+ "direct-IP multiplayer need a downloaded desktop build.")
+		_set_status("Browser build: single-player only (Play Offline). Steam multiplayer needs a "
+				+ "downloaded desktop build.")
 	if success:
 		# A lobby Steam named at launch is a command, not an offer: a friend pressed
 		# "Join Game" for us, which is not something to be asked about. Straight in.
@@ -405,23 +375,16 @@ func _on_steam_initialized(success: bool) -> void:
 		if not web_build:
 			_set_status("PLAY joins the open world, or opens one if nobody is playing.")
 		if NetworkManager.lobby_visibility == NetworkManager.LobbyVisibility.FRIENDS_ONLY:
-			# On a friends-only app the lobby list cannot see a friend's session, so
-			# say how to get into one instead of letting PLAY quietly open a second.
-			_set_status("PLAY opens a private world. Friends join from the Steam "
-					+ "friends list, or by pasting the lobby id.")
+			# On a friends-only app the lobby list cannot see a friend's session, so say how to
+			# get into one instead of letting PLAY quietly open a second.
+			_set_status("PLAY opens a private world. Friends see it in their list, or join from "
+					+ "the Steam friends list.")
 		_run_launch_action()
 	else:
 		# Offline and direct play need no Steam, so a command-line launch of either still runs.
 		if _launch_action == "--offline" or _launch_action == "--host-direct" \
 				or _launch_action.begins_with("--join-direct"):
 			_run_launch_action()
-
-
-func _refresh_identity() -> void:
-	if SteamManager.is_initialized:
-		_identity.text = "Steam: %s   (id %d)" % [SteamManager.persona_name, SteamManager.steam_id]
-	else:
-		_identity.text = "Steam: not connected"
 
 
 func _set_status(text: String) -> void:

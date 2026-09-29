@@ -22,13 +22,14 @@ func _screen() -> Control:
 	return screen
 
 
+## The buttons that still exist. The overrides (Host New World, Host Dungeon, Auto-Join Dungeon,
+## Join-by-Lobby-ID) are gone from the menu on Mohamed's instruction - "all of that shouldn't be
+## there, make it simple and minimal" - so the rule that no button is ever dead applies to what is
+## left, plus the row buttons the list builds at runtime.
 func _steam_buttons(screen: Control) -> Array[Button]:
 	return [
 		screen.get_node("%PlayButton"),
-		screen.get_node("%HostWorldButton"),
-		screen.get_node("%HostDungeonButton"),
-		screen.get_node("%AutoDungeonButton"),
-		screen.get_node("%JoinButton"),
+		screen.get_node("%LobbyRefreshButton"),
 	]
 
 
@@ -83,7 +84,6 @@ func test_a_steam_failure_leaves_every_network_button_pressable() -> void:
 	for button: Button in _steam_buttons(screen):
 		assert_false(button.disabled,
 			"'%s' must stay pressable: a disabled button cannot explain itself" % button.name)
-	assert_true(screen.get_node("%LobbyIdInput").editable, "the lobby id field stays usable")
 
 
 func test_a_steam_failure_shows_the_reason_the_player_can_act_on() -> void:
@@ -147,6 +147,38 @@ func test_retrying_an_already_good_steam_is_harmless() -> void:
 	SteamManager.retry()
 	SteamManager.is_initialized = was_initialized
 	assert_signal_emitted_with_parameters(SteamManager, "steam_initialized", [true])
+
+
+#endregion
+#region The minimal menu ----------------------------------------------------------
+
+## Mohamed, verbatim: "rework the ui, all of that shouldn't be there, make it simple and minimal,
+## get rid of the auto join dungeon." A menu grows back one button at a time, so the removals are
+## held by name: if any of these returns, it has to return past this test and the reason it exists.
+const REMOVED_NODES := [
+	"HostWorldButton", "HostDungeonButton", "AutoDungeonButton",
+	"LobbyIdInput", "JoinButton",
+	"DirectHostButton", "DirectJoinButton", "DirectAddressInput",
+	"Subtitle", "Identity", "Controls",
+]
+
+
+func test_the_menus_removed_clutter_stays_removed() -> void:
+	var screen: Control = _screen()
+	for node_name: String in REMOVED_NODES:
+		assert_null(screen.find_child(node_name, true, false),
+			"'%s' was removed on purpose: it is a testing override, not a choice a player makes"
+			% node_name)
+
+
+func test_the_menu_still_offers_every_choice_a_player_needs() -> void:
+	# The other half of a minimal menu: not only what went, but that nothing else went with it.
+	var screen: Control = _screen()
+	for node_name: String in ["PlayButton", "OfflineButton", "QuitButton",
+			"LobbyListBox", "LobbyRefreshButton", "LobbyListStatus",
+			"SteamBanner", "OpenSteamButton", "SteamRetryButton", "Status"]:
+		assert_not_null(screen.find_child(node_name, true, false),
+			"'%s' must survive the tidy-up" % node_name)
 
 
 #endregion
