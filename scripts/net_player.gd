@@ -41,6 +41,7 @@ const LOCAL_PLAYER_GROUP: String = "local_player"
 @export var anim_state: String = "idle" : set = _set_anim_state
 
 var _is_local: bool = false
+var _pose_age: float = 0.0
 
 
 ## The vendored state machine names differ from the model's animation names ("Inair" is
@@ -62,12 +63,39 @@ static func animation_for_state(state_name: String) -> String:
 ## Runs on the OWNER when it publishes the state, and on every PUPPET when that value
 ## arrives. Only the puppet acts on it: the owner's state machine has already driven the
 ## model itself, and asking for the same animation twice would fight it.
+## How often a puppet re-states its pose. It cannot be "only when the value changes",
+## because the model pulls the pose away on its own - see _renew_puppet_pose.
+const POSE_RENEW_SECONDS: float = 0.4
+
+
+## Whether a puppet is due to state its pose again. Pure, so the rule is testable without a
+## model and without waiting in real time.
+static func pose_renew_due(seconds_since_last: float, interval: float) -> bool:
+	return seconds_since_last >= interval
+
+
 func _set_anim_state(value: String) -> void:
 	anim_state = value
+	_pose_age = 0.0
 	if _is_local or not is_node_ready():
 		return
 	if _skin != null and _skin.has_method("set_state"):
 		_skin.set_state(value)
+
+
+## A puppet has no movement input of its own: the vendored state scripts that set the model's
+## parameters are switched off, which is exactly what makes it a puppet. The model's state
+## machine has transitions of its own, so a pose set once gets pulled back to idle about a
+## second later - mid-stride, while the owner keeps walking. That was the reported bug in its
+## second form: the animation NAME arrived and the avatar froze anyway. Renewing the pose on a
+## slow interval holds it, and stays clear of the model's blends, which are much shorter.
+func _renew_puppet_pose(delta: float) -> void:
+	_pose_age += delta
+	if not pose_renew_due(_pose_age, POSE_RENEW_SECONDS):
+		return
+	_pose_age = 0.0
+	if _skin != null and _skin.has_method("set_state"):
+		_skin.set_state(anim_state)
 
 
 func _enter_tree() -> void:
@@ -139,14 +167,17 @@ func _make_puppet() -> void:
 		_skin.set_state(anim_state)
 
 
-func _process(_delta: float) -> void:
-	# The asset's camera scene ships with current=true, so a remote player that
-	# spawns after us briefly steals the viewport camera. Re-assert ours.
-	if _is_local and not _camera.current:
-		_camera.current = true
-	elif _is_local:
+func _process(delta: float) -> void:
+	if _is_local:
+		# The asset's camera scene ships with current=true, so a remote player that
+		# spawns after us briefly steals the viewport camera. Re-assert ours.
+		if not _camera.current:
+			_camera.current = true
 		# Only the owner can see its own state machine, so it is the one that publishes
 		# the animation. Assigning through the setter is what the synchronizer carries.
 		var derived: String = animation_for_state(str(_state_machine.curr_state_name))
 		if derived != anim_state:
 			anim_state = derived
+		return
+	# The puppet's half of the same sentence: hold the pose the owner published.
+	_renew_puppet_pose(delta)
