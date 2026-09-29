@@ -345,3 +345,16 @@ did not happen.
 `HEARTBEAT-<agent>.md` is watched by nobody, on purpose: watching it would make each side's
 heartbeat look like news, and two watchers would ping-pong forever. Never put anything in a
 heartbeat you need read.
+
+
+## Read these two before touching anything
+
+* `docs/WORKFLOW.md` - how Castor and Pollux coordinate: git is the source of truth, the shared
+  Drive carries messages and artifacts only, one open question at a time, the freeze rule while a
+  shared test is pending, and the one-cut rule for anything that changes shipped bytes.
+* `docs/CODE_GUIDE.md` - the readability and modularity standard, with the real module sizes and
+  the staged plan for splitting `autoload/NetworkManager.gd` (1051 lines, five jobs).
+
+`tools/sync_check.sh` prints the state line both agents paste before a shared test:
+`STATE agent=<name> sha=<sha> ver=<version> protocol=<n> dirty=<n>`. A test where the two lines
+disagree is two people testing two things.
