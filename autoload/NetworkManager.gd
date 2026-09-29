@@ -26,6 +26,13 @@ signal peer_connected(peer_id: int)
 signal peer_disconnected(peer_id: int)
 signal connection_failed
 
+## The host vanished and the session CONTINUED rather than ending. `became_host` says
+## whether we took it over ourselves or reconnected to whoever Steam promoted. Kept
+## separate from `lobby_left`, which still means "the session is over": a listener that
+## treated them the same would send the player back to the menu at the exact moment the
+## player should carry on.
+signal host_migrated(became_host: bool)
+
 ## Someone asked us to join them: they picked "Join Game" for us in their friends
 ## list, or accepted an invite we sent. `steam_id` is the friend; `accepted` is
 ## false when we could not act on it (already hosting, say), so a caller can tell
@@ -66,6 +73,19 @@ enum Transport {
 	## create_host() / create_client(): the documented siblings, with a port both
 	## ends name explicitly.
 	CANONICAL,
+}
+
+## What to do when the host disappears. Steam has already promoted a remaining member to
+## own the lobby by the time we ask, so "stay in the game" is usually possible - and being
+## logged out is the wrong default, because our character, our progress and the world are
+## all still perfectly valid.
+enum MigrationPlan {
+	## No lobby to continue in (a direct-IP session, or no session at all): end it.
+	END_SESSION,
+	## Steam handed US the lobby: become the host of the session we are already in.
+	TAKE_OVER,
+	## Someone else owns it now: follow them to their session.
+	FOLLOW_OWNER,
 }
 
 ## Virtual port used in CANONICAL mode. SteamNetworkingSockets uses it only to
@@ -1001,8 +1021,101 @@ func _on_connection_failed() -> void:
 
 
 func _on_server_disconnected() -> void:
+	# The host is gone. Ending the session here is what this used to do, and it is the
+	# wrong answer: the world, our character and our progress are all still there, and
+	# Steam has already handed the lobby to whoever is left. So try to continue first.
+	if _try_host_migration():
+		return
 	push_warning("[NetworkManager] Host disconnected; session ended.")
 	lobby_left.emit()
+
+
+## The decision behind host migration, as a pure function of three facts, so the
+## interesting half is testable with no Steam, no peer and no lobby.
+static func migration_plan(is_direct: bool, in_lobby: bool, we_own_lobby: bool) -> MigrationPlan:
+	if is_direct or not in_lobby:
+		return MigrationPlan.END_SESSION
+	return MigrationPlan.TAKE_OVER if we_own_lobby else MigrationPlan.FOLLOW_OWNER
+
+
+## Continue the session without the departed host. Returns false when there is nothing
+## to continue in, which leaves the caller to end it the old way.
+func _try_host_migration() -> bool:
+	if not SteamManager.is_initialized:
+		return false
+	if current_lobby_id == 0:
+		# Nothing to continue: a direct session has no lobby, and no session at all has
+		# nothing to hand over.
+		return false
+	var owner_steam_id: int = 0
+	if current_lobby_id != 0:
+		owner_steam_id = Steam.getLobbyOwner(current_lobby_id)
+	var plan: MigrationPlan = migration_plan(
+			_direct_session, current_lobby_id != 0, owner_steam_id == SteamManager.steam_id)
+	match plan:
+		MigrationPlan.TAKE_OVER:
+			return _take_over_lobby()
+		MigrationPlan.FOLLOW_OWNER:
+			return _follow_new_owner(owner_steam_id)
+	return false
+
+
+## Steam promoted us (the owner left and we were next), so the session does not have to
+## die: we become its host, in place. The world stays loaded and nobody is logged out.
+##
+## The scene half of this - who the node called `player_1` now is - belongs to the level,
+## which is why this only emits `host_migrated` and lets it do the node surgery.
+func _take_over_lobby() -> bool:
+	if current_lobby_id == 0:
+		return false
+	_rebuild_peer(true, 0)
+	if peer == null:
+		return false
+	is_host = true
+	_party_transition_started = false
+	# The lobby is ours now, so keep telling the truth about it to anyone who asks.
+	Steam.setLobbyData(current_lobby_id, KEY_TYPE, current_lobby_type)
+	_publish_presence("hosting")
+	_publish_member_build(current_lobby_id)
+	print("[NetworkManager] Took the session over as host (lobby %d, port %d, type '%s')." % [
+			current_lobby_id, virtual_port, current_lobby_type])
+	host_migrated.emit(true)
+	return true
+
+
+## Someone else owns the lobby now. Follow them to the session they will host on the same
+## virtual port the old one used - which is why that port is a project constant rather
+## than anything per-peer: whoever takes over must be reachable where the last host was.
+func _follow_new_owner(owner_steam_id: int) -> bool:
+	if owner_steam_id <= 0 or owner_steam_id == SteamManager.steam_id:
+		return false
+	_rebuild_peer(false, owner_steam_id)
+	if peer == null:
+		return false
+	is_host = false
+	print("[NetworkManager] The old host left; following Steam's new lobby owner %d." % owner_steam_id)
+	host_migrated.emit(false)
+	return true
+
+
+## Drop the dead peer and open a new one. The old object is bound to a session nobody is
+## serving any more, and reusing it would leave us dialling a ghost.
+func _rebuild_peer(as_host: bool, target_steam_id: int) -> void:
+	if peer != null:
+		if multiplayer != null:
+			multiplayer.multiplayer_peer = null
+		peer.close()
+		peer = null
+	var fresh: SteamMultiplayerPeer = _make_peer()
+	var err: int = fresh.create_host(virtual_port) if as_host \
+			else fresh.create_client(target_steam_id, virtual_port)
+	if err != OK:
+		push_error("[NetworkManager] Could not restart the session (Steam error %d); "
+				% err + "the migration is over.")
+		fresh.close()
+		return
+	peer = fresh
+	multiplayer.multiplayer_peer = peer
 
 #endregion
 

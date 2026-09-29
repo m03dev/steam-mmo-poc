@@ -38,6 +38,9 @@ var _fallback_cam: Camera3D = null
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	trigger.body_entered.connect(_on_trigger_entered)
+	# The session can outlive its host: NetworkManager decides that and tells us here,
+	# because the node surgery it needs is ours to do (see _on_host_migrated).
+	NetworkManager.host_migrated.connect(_on_host_migrated)
 	# A level announces itself, so anything that needs to know where players appear
 	# can find it by group rather than by guessing at node paths.
 	add_to_group(WorldState.KIND_LEVEL)
@@ -153,6 +156,38 @@ func _despawn(id: int) -> void:
 	var node: Node = players.get_node_or_null("player_%d" % id)
 	if node != null:
 		node.queue_free()
+
+
+## The host left and we took the session over (or followed whoever now owns it).
+##
+## Taking over means one thing has to change in the SCENE: who `player_1` is. A Godot
+## server is always peer 1, and in this codebase the node NAME is the authority, so the
+## departed host's avatar has to go and the local one has to take its name. Freeing it
+## immediately (not queue_free) matters: a queued free leaves the name taken, Godot
+## renames ours to "@player_1@2" to avoid the clash, and every authority in the scene
+## silently points at a node nobody has.
+func _on_host_migrated(became_host: bool) -> void:
+	if not became_host:
+		return
+	var mine: Node3D = get_tree().get_first_node_in_group(NetPlayer.LOCAL_PLAYER_GROUP) as Node3D
+	var theirs: Node3D = players.get_node_or_null("player_1") as Node3D
+	if theirs != null and theirs != mine:
+		players.remove_child(theirs)
+		theirs.free()
+	if mine != null:
+		mine.name = "player_1"
+		# Recursive on purpose: the synchronizers and components under the avatar all
+		# belong to whoever owns the new session now, which is us.
+		mine.set_multiplayer_authority(1, true)
+		var tag: Label3D = mine.get_node_or_null("NameTag") as Label3D
+		if tag != null:
+			tag.text = SteamManager.name_tag_for(1)
+	# We are the server now, so we are the one that spawns and despawns other players.
+	if not multiplayer.peer_connected.is_connected(_spawn):
+		multiplayer.peer_connected.connect(_spawn)
+	if not multiplayer.peer_disconnected.is_connected(_despawn):
+		multiplayer.peer_disconnected.connect(_despawn)
+	print("[Level/%s] took the session over: player_1 is the local avatar now." % level_type)
 
 
 func _spawn_local() -> void:

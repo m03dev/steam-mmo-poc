@@ -28,10 +28,46 @@ const LOCAL_PLAYER_GROUP: String = "local_player"
 @onready var _camera_holder: Node = _character.get_node("CameraHolder")
 @onready var _state_machine: Node = _character.get_node("StateMachine")
 @onready var _visual_root: Node3D = _character.get_node("VisualRoot")
+@onready var _skin: Node = _character.get_node_or_null("VisualRoot/GodotPlushSkin")
 @onready var _hud: CanvasLayer = _character.get_node("HUD")
 @onready var _camera: Camera3D = _character.get_node("CameraHolder/SpringArm3D/Camera3D")
 
+## The animation the model should be playing, replicated from whoever owns the
+## character. WHY THIS EXISTS: the vendored state scripts call
+## `godot_plush_skin.set_state(...)` themselves, but a puppet's state machine is switched
+## off (it must not read the LOCAL keyboard), so that call never happens on a remote peer
+## and every other player stood frozen in its spawn pose while sliding around the map.
+## The state name is the one fact only the owner has, so it is the thing worth sending.
+@export var anim_state: String = "idle" : set = _set_anim_state
+
 var _is_local: bool = false
+
+
+## The vendored state machine names differ from the model's animation names ("Inair" is
+## the state, "fall" is the animation), so the mapping lives in exactly one place.
+static func animation_for_state(state_name: String) -> String:
+	match state_name:
+		"Walk":
+			return "walk"
+		"Run":
+			return "run"
+		"Jump":
+			return "jump"
+		"Inair":
+			return "fall"
+		_:
+			return "idle"
+
+
+## Runs on the OWNER when it publishes the state, and on every PUPPET when that value
+## arrives. Only the puppet acts on it: the owner's state machine has already driven the
+## model itself, and asking for the same animation twice would fight it.
+func _set_anim_state(value: String) -> void:
+	anim_state = value
+	if _is_local or not is_node_ready():
+		return
+	if _skin != null and _skin.has_method("set_state"):
+		_skin.set_state(value)
 
 
 func _enter_tree() -> void:
@@ -96,6 +132,11 @@ func _make_puppet() -> void:
 	_state_machine.set_process(false)
 	_camera_holder.set("active", false)  # stops its _input/_process
 	_camera.current = false
+	# The first replicated value can arrive before this node is ready, and the setter
+	# drops anything that early, so say the current pose once here. Without this a
+	# puppet whose owner is standing still would hold its spawn pose forever.
+	if _skin != null and _skin.has_method("set_state"):
+		_skin.set_state(anim_state)
 
 
 func _process(_delta: float) -> void:
@@ -103,3 +144,9 @@ func _process(_delta: float) -> void:
 	# spawns after us briefly steals the viewport camera. Re-assert ours.
 	if _is_local and not _camera.current:
 		_camera.current = true
+	elif _is_local:
+		# Only the owner can see its own state machine, so it is the one that publishes
+		# the animation. Assigning through the setter is what the synchronizer carries.
+		var derived: String = animation_for_state(str(_state_machine.curr_state_name))
+		if derived != anim_state:
+			anim_state = derived
