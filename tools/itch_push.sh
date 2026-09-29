@@ -205,8 +205,10 @@ cat <<REMINDERS
       unzip -l /tmp/itch_fetched/*.zip | head   # the .app must still be inside
 
 ==> Reminders for the page text, or the downloads get reported as broken:
-    * macOS is UNSIGNED: right-click -> Open once, or
-      xattr -dr com.apple.quarantine SteamMMO.app. Say so on the page.
+    * macOS is UNSIGNED. Right-click -> Open is NOT enough on current macOS (the
+      dialog offers only Move to Trash / Done). The page must say: drag SteamMMO.app
+      out of Downloads into Applications, click Done, then System Settings ->
+      Privacy & Security -> Open Anyway; or xattr -dr com.apple.quarantine.
     * Multiplayer in the downloads: Steam, or direct IP with no Steam at all
       (LAN as-is; across the internet the host forwards UDP port 23460).
       The browser build, if ever pushed, is single-player only by nature.
