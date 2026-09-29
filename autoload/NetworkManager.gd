@@ -21,6 +21,10 @@ signal lobby_create_failed(reason: String)
 signal lobby_joined(lobby_id: int)
 signal lobby_join_failed(reason: String)
 signal lobby_list_received(lobbies: Array)
+## The open lobbies as rows a menu can draw: {id, name, type, members, max, owner}.
+## Emitted after refresh_lobby_list(). An EMPTY array means "asked, and there is nothing to show",
+## which is deliberately different from silence: a menu can tell "no servers" from "still asking".
+signal lobby_list_updated(summaries: Array[Dictionary])
 signal lobby_left
 signal peer_connected(peer_id: int)
 signal peer_disconnected(peer_id: int)
@@ -334,6 +338,65 @@ func request_lobby_list() -> void:
 
 ## Join the first open lobby of `lobby_type`, or create one if none exists.
 ## This is the "just works" entry point the shipped game calls on launch.
+## Whether a lobby list request is in flight for the MENU, as opposed to the auto-join search.
+var _listing_lobbies: bool = false
+
+
+## Ask Steam for the open lobbies and answer through `lobby_list_updated`.
+##
+## Separate from auto_join_first_open() because seeing the servers and joining one are different
+## intentions: PLAY takes the first open world, while a list lets a player choose. A friends-only
+## session is invisible to Steam's list by design, so it never appears here - the menu says so.
+func refresh_lobby_list() -> void:
+	if not SteamManager.is_initialized:
+		# Answer immediately rather than leaving a menu waiting on a callback that cannot arrive.
+		var nothing: Array[Dictionary] = []
+		lobby_list_updated.emit(nothing)
+		return
+	_listing_lobbies = true
+	Steam.requestLobbyList()  # async -> _on_steam_lobby_match_list
+
+
+## The rows a menu draws, built from the raw ids Steam returns.
+func _lobby_summaries(lobbies: Array) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for entry: Variant in lobbies:
+		var lobby_id: int = _lobby_id_of(entry)
+		if lobby_id == 0:
+			continue
+		var limit: int = Steam.getLobbyMemberLimit(lobby_id)
+		if limit <= 0:
+			limit = MAX_MEMBERS
+		var owner_name: String = Steam.getFriendPersonaName(Steam.getLobbyOwner(lobby_id))
+		var lobby_type: String = Steam.getLobbyData(lobby_id, KEY_TYPE)
+		rows.append({
+			"id": lobby_id,
+			"name": "%s's %s" % [owner_name if not owner_name.is_empty() else "Someone",
+					lobby_type],
+			"type": lobby_type,
+			"members": Steam.getNumLobbyMembers(lobby_id),
+			"max": limit,
+			"owner": owner_name,
+		})
+	return order_summaries(rows)
+
+
+## Room to spare first, then the busiest, then by id so the order is stable between refreshes.
+## Pure, because ordering is a rule rather than a Steam call, and a list that reshuffles itself
+## every second is a list nobody can click.
+static func order_summaries(rows: Array[Dictionary]) -> Array[Dictionary]:
+	var sorted_rows: Array[Dictionary] = rows.duplicate()
+	sorted_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_open: bool = int(a.get("members", 0)) < int(a.get("max", 0))
+		var b_open: bool = int(b.get("members", 0)) < int(b.get("max", 0))
+		if a_open != b_open:
+			return a_open
+		if int(a.get("members", 0)) != int(b.get("members", 0)):
+			return int(a.get("members", 0)) > int(b.get("members", 0))
+		return int(a.get("id", 0)) < int(b.get("id", 0)))
+	return sorted_rows
+
+
 func auto_join_first_open(lobby_type: String) -> void:
 	if not _require_steam("auto_join_first_open"):
 		return
@@ -963,6 +1026,10 @@ func join_direct(address: String, port: int = 0) -> int:
 
 func _on_steam_lobby_match_list(lobbies: Array) -> void:
 	lobby_list_received.emit(lobbies)
+	# The menu asked; answer it, whatever the auto-join search happens to be doing.
+	if _listing_lobbies:
+		_listing_lobbies = false
+		lobby_list_updated.emit(_lobby_summaries(lobbies))
 	if _pending_autojoin_type.is_empty():
 		return
 	var wanted: String = _pending_autojoin_type
