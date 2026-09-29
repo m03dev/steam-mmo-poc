@@ -18,6 +18,13 @@ const STEAM_MANAGER := preload("res://autoload/SteamManager.gd")
 @onready var _direct_address_input: LineEdit = %DirectAddressInput
 @onready var _steam_banner: PanelContainer = %SteamBanner
 @onready var _steam_problem: Label = %SteamProblem
+@onready var _lobby_list_box: VBoxContainer = %LobbyListBox
+@onready var _lobby_list_status: Label = %LobbyListStatus
+
+## How often the server list asks Steam what is open. Slow enough to be free, fast enough that a
+## friend you are waiting for appears while you are still looking at the menu.
+const LIST_REFRESH_SECONDS: float = 4.0
+var _lobby_timer: Timer = null
 
 ## Set from the command line, then consumed once Steam is ready. See
 ## _read_launch_action().
@@ -52,11 +59,23 @@ func _ready() -> void:
 	NetworkManager.join_invited.connect(_on_join_invited)
 	SteamManager.steam_initialized.connect(_on_steam_initialized)
 
+	# The server list: rows a player can click, which is the whole point of it. A Timer rather
+	# than a loop in _process, because this is for a human deciding, not a frame-rate concern,
+	# and asking Steam every frame would cost something for nothing.
+	%LobbyRefreshButton.pressed.connect(_refresh_lobbies)
+	NetworkManager.lobby_list_updated.connect(_on_lobby_list_updated)
+	_lobby_timer = Timer.new()
+	_lobby_timer.wait_time = LIST_REFRESH_SECONDS
+	_lobby_timer.timeout.connect(_refresh_lobbies)
+	add_child(_lobby_timer)
+	_lobby_timer.start()
+
 	_launch_action = _read_launch_action()
 	_refresh_identity()
 	# SteamManager is an autoload, so it may already have resolved before this
 	# scene ran; apply the current state rather than waiting for a signal.
 	_on_steam_initialized(SteamManager.is_initialized)
+	_refresh_lobbies()
 
 
 ## Dev convenience: skip the menu from the command line, so a host can be left
@@ -237,6 +256,92 @@ func _enter_game() -> void:
 	# _ready. The Steam path never showed the bug only because its signals arrive a
 	# frame later; a direct host and --offline both hit it head-on.
 	get_tree().change_scene_to_file.call_deferred(GAME_SCENE)
+
+
+## Ask Steam what is open, and answer immediately when there is nothing to ask with.
+func _refresh_lobbies() -> void:
+	if not SteamManager.is_initialized:
+		_show_lobby_rows([])
+		_lobby_list_status.text = lobby_list_status_text(0, false)
+		return
+	_lobby_list_status.text = lobby_list_status_text(-1, true)
+	NetworkManager.refresh_lobby_list()
+
+
+func _on_lobby_list_updated(summaries: Array[Dictionary]) -> void:
+	_show_lobby_rows(summaries)
+	_lobby_list_status.text = lobby_list_status_text(summaries.size(), true,
+		joinable_count(summaries))
+
+
+## Rows rather than a sentence, because that is the difference between being told a world exists
+## and being able to join it. Rebuilt on every refresh, so a world that closed disappears.
+func _show_lobby_rows(summaries: Array[Dictionary]) -> void:
+	for child: Node in _lobby_list_box.get_children():
+		child.queue_free()
+	for row: Dictionary in summaries:
+		var button := Button.new()
+		button.text = lobby_row_text(row)
+		# A row offering a build we cannot join is a trap, and a click that is certain to fail
+		# is not a choice. It stays visible - a friend on the old build is information - but it
+		# says so and does not pretend to be pressable.
+		button.disabled = not bool(row.get("compatible", true))
+		button.pressed.connect(_join_from_list.bind(int(row.get("id", 0))))
+		_lobby_list_box.add_child(button)
+
+
+## Clicking a row is the same intention as typing a lobby id, so it takes the same path - and the
+## same gate, so a row press without Steam explains instead of doing nothing.
+func _join_from_list(lobby_id: int) -> void:
+	if not _steam_ready() or lobby_id == 0:
+		return
+	_set_status("Joining lobby %d..." % lobby_id)
+	NetworkManager.join_lobby(lobby_id)
+
+
+## One row's text. Pure, so the wording is testable without a lobby list to look at.
+static func lobby_row_text(row: Dictionary) -> String:
+	var owner_name: String = str(row.get("owner", ""))
+	if owner_name.is_empty():
+		owner_name = "Someone"
+	# "name" is a Node property, so this local is named for what it is.
+	var label: String = str(row.get("name", ""))
+	if label.is_empty():
+		label = "%s's world" % owner_name
+	# Saying which build is useless without saying HOW it is useless: a friend on the old build
+	# appearing in the list and then refusing the join is worse than not seeing them at all.
+	if not bool(row.get("compatible", true)):
+		return "%s  -  different version (%s)" % [label, str(row.get("version", "?"))]
+	var members: int = int(row.get("members", 0))
+	var maximum: int = int(row.get("max", 0))
+	if maximum > 0 and members >= maximum:
+		return "%s  -  FULL (%d/%d)" % [label, members, maximum]
+	return "%s  -  %d/%d" % [label, members, maximum]
+
+
+## How many listed worlds this build can actually join.
+static func joinable_count(rows: Array[Dictionary]) -> int:
+	var total: int = 0
+	for row: Dictionary in rows:
+		if bool(row.get("compatible", true)):
+			total += 1
+	return total
+
+
+## The line under the list. A count of -1 means the answer has not arrived yet, which is a
+## different state from "there is nothing open" and must never read as one.
+static func lobby_list_status_text(count: int, steam_ready: bool, joinable: int = -1) -> String:
+	if not steam_ready:
+		return "Sign in to the Steam app to see open worlds here."
+	if count < 0:
+		return "Looking for open worlds..."
+	if count == 0:
+		return "No open worlds yet. PLAY opens one, and friends will see it here."
+	# A list of worlds you cannot enter is not an invitation, so the line must not promise one.
+	if joinable == 0:
+		return "%d open world%s, but none this build can join - they are a different version." % [
+			count, "" if count == 1 else "s"]
+	return "%d open world%s - click one to join." % [count, "" if count == 1 else "s"]
 
 
 func _on_steam_initialized(success: bool) -> void:

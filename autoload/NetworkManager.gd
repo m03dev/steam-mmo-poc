@@ -105,6 +105,9 @@ const RESULT_OK: int = 1
 ## The two lobby "types" that back the two layers.
 const TYPE_WORLD: String = "world"
 const TYPE_DUNGEON: String = "dungeon"
+## Every lobby type we ever publish. Used to tell our lobbies apart from other people's in the
+## public list, which on a shared App ID is most of what is there.
+const OUR_LOBBY_TYPES := [TYPE_WORLD, TYPE_DUNGEON]
 
 ## Party travel, carried on Steam's lobby metadata rather than on the RPC layer.
 ##
@@ -357,6 +360,18 @@ func refresh_lobby_list() -> void:
 	Steam.requestLobbyList()  # async -> _on_steam_lobby_match_list
 
 
+## Whether a lobby from the public list is one of OURS.
+##
+## This is not a formality: an App ID is a shared namespace, and the dev App ID (480, Valve's
+## "Spacewar") is shared with every other developer on Steam. Running the menu against it listed
+## fifty strangers' lobbies. A lone, generic key is not enough of a fingerprint either - a second
+## run showed a lobby from an unrelated project that happened to use our very key name. So the
+## test is all three things we always publish and a lobby of ours always has: one of our types,
+## a build version, and a protocol.
+static func is_our_lobby(lobby_type: String, version: String, protocol: String) -> bool:
+	return lobby_type in OUR_LOBBY_TYPES and not version.is_empty() and not protocol.is_empty()
+
+
 ## The rows a menu draws, built from the raw ids Steam returns.
 func _lobby_summaries(lobbies: Array) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
@@ -364,11 +379,21 @@ func _lobby_summaries(lobbies: Array) -> Array[Dictionary]:
 		var lobby_id: int = _lobby_id_of(entry)
 		if lobby_id == 0:
 			continue
+		var lobby_type: String = Steam.getLobbyData(lobby_id, KEY_TYPE)
+		var version: String = Steam.getLobbyData(lobby_id, KEY_VERSION)
+		var protocol: String = Steam.getLobbyData(lobby_id, KEY_PROTOCOL)
+		if not is_our_lobby(lobby_type, version, protocol):
+			continue
 		var limit: int = Steam.getLobbyMemberLimit(lobby_id)
 		if limit <= 0:
 			limit = MAX_MEMBERS
-		var owner_name: String = Steam.getFriendPersonaName(Steam.getLobbyOwner(lobby_id))
-		var lobby_type: String = Steam.getLobbyData(lobby_id, KEY_TYPE)
+		# A lobby we are not in can report an owner we cannot resolve, and asking for their
+		# persona then fails once per refresh per lobby. An unnamed host is a missing nicety,
+		# not a reason to fill the log.
+		var owner_name: String = ""
+		var owner_id: int = Steam.getLobbyOwner(lobby_id)
+		if owner_id > 0:
+			owner_name = Steam.getFriendPersonaName(owner_id)
 		rows.append({
 			"id": lobby_id,
 			"name": "%s's %s" % [owner_name if not owner_name.is_empty() else "Someone",
@@ -377,6 +402,10 @@ func _lobby_summaries(lobbies: Array) -> Array[Dictionary]:
 			"members": Steam.getNumLobbyMembers(lobby_id),
 			"max": limit,
 			"owner": owner_name,
+			# Additive to the frozen row: a list that offers a build you cannot join is a trap,
+			# so the UI needs to know before the click.
+			"version": version,
+			"compatible": version == GAME_VERSION,
 		})
 	return order_summaries(rows)
 
@@ -391,6 +420,12 @@ static func order_summaries(rows: Array[Dictionary]) -> Array[Dictionary]:
 		var b_open: bool = int(b.get("members", 0)) < int(b.get("max", 0))
 		if a_open != b_open:
 			return a_open
+		# Then builds we can actually join: a world we cannot enter is not a choice, however
+		# busy it is.
+		var a_compatible: bool = bool(a.get("compatible", true))
+		var b_compatible: bool = bool(b.get("compatible", true))
+		if a_compatible != b_compatible:
+			return a_compatible
 		if int(a.get("members", 0)) != int(b.get("members", 0)):
 			return int(a.get("members", 0)) > int(b.get("members", 0))
 		return int(a.get("id", 0)) < int(b.get("id", 0)))

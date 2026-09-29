@@ -123,6 +123,40 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 34)
 text = "Join Lobby"
 
+[node name="LobbyListPanel" type="PanelContainer" parent="Center/Panel/VBox"]
+
+[node name="ListVBox" type="VBoxContainer" parent="Center/Panel/VBox/LobbyListPanel"]
+theme_override_constants/separation = 6
+
+[node name="ListHeader" type="HBoxContainer" parent="Center/Panel/VBox/LobbyListPanel/ListVBox"]
+
+[node name="ListTitle" type="Label" parent="Center/Panel/VBox/LobbyListPanel/ListVBox/ListHeader"]
+theme_override_colors/font_color = Color(0.607843, 0.811765, 0.964706, 1)
+theme_override_font_sizes/font_size = 12
+text = "OPEN WORLDS"
+size_flags_horizontal = 3
+
+[node name="LobbyRefreshButton" type="Button" parent="Center/Panel/VBox/LobbyListPanel/ListVBox/ListHeader"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 0)
+text = "Refresh"
+
+[node name="ListScroll" type="ScrollContainer" parent="Center/Panel/VBox/LobbyListPanel/ListVBox"]
+custom_minimum_size = Vector2(0, 104)
+horizontal_scroll_mode = 0
+
+[node name="LobbyListBox" type="VBoxContainer" parent="Center/Panel/VBox/LobbyListPanel/ListVBox/ListScroll"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="LobbyListStatus" type="Label" parent="Center/Panel/VBox/LobbyListPanel/ListVBox"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(0.505882, 0.607843, 0.717647, 1)
+theme_override_font_sizes/font_size = 11
+text = "Looking for open worlds..."
+autowrap_mode = 3
+
 [node name="DirectHostRow" type="HBoxContainer" parent="Center/Panel/VBox"]
 theme_override_constants/separation = 8
 

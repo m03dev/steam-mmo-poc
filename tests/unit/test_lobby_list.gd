@@ -76,3 +76,34 @@ func test_the_row_keys_are_the_frozen_contract() -> void:
 		assert_true(source.contains(key + ":"), "the row still carries %s" % key)
 	assert_true(source.contains("func refresh_lobby_list()"),
 		"and the refresh entry point keeps its name")
+
+
+func test_a_lobby_that_is_not_ours_is_not_a_world() -> void:
+	# Found by actually running the menu: App ID 480 is Valve's shared test app, so the public
+	# lobby list contained fifty unjoinable lobbies belonging to strangers. A row that cannot be
+	# joined is worse than no row, so only lobbies carrying our own keys count.
+	assert_true(NetworkManager.is_our_lobby("world", "0.0015", "3"), "our world lobby is ours")
+	assert_true(NetworkManager.is_our_lobby("dungeon", "0.0015", "3"), "and so is a dungeon")
+	assert_false(NetworkManager.is_our_lobby("", "0.0015", "3"), "a lobby with no type for us is not")
+	assert_false(NetworkManager.is_our_lobby("ynx2_seamless_master_lobby", "", ""),
+		"nor is another project's lobby that merely shares a key name")
+	assert_false(NetworkManager.is_our_lobby("world", "", "3"),
+		"nor a 'world' with no build behind it to join")
+
+
+func test_an_older_build_of_ours_is_still_a_world() -> void:
+	# Filtering must not hide a friend who simply has not updated: that is what the row's
+	# version note is for.
+	assert_true(NetworkManager.is_our_lobby("world", "0.0012", "3"),
+		"an old build of ours is still ours")
+
+
+func test_a_build_we_cannot_join_sorts_below_one_we_can() -> void:
+	var old: Dictionary = _row(1, 5, 8)
+	old["compatible"] = false
+	old["version"] = "0.0012"
+	var current: Dictionary = _row(2, 1, 8)
+	current["compatible"] = true
+	var ordered: Array[Dictionary] = NetworkManager.order_summaries([old, current])
+	assert_eq(int(ordered[0]["id"]), 2, "the joinable build is offered first")
+	assert_eq(int(ordered[1]["id"]), 1, "and the incompatible one is still visible, just lower")
