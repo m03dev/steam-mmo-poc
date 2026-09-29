@@ -109,3 +109,10 @@ different size, and that is the quickest way to catch it.
 - `SteamMMO_0.0016_macos.zip` -- 67456249 bytes -- sha256 `80ce5bda8c26f0b15ca70da73dae79bea7eed2a44e886aa9478202a48fe87d47` (macOS)
 - `build/web/` --  46M -- Web/HTML5, built from the same tree
 
+## 0.0017 -- 2026-09-29 00:12
+
+- The host can see their own world in the browser, and worlds name the players inside
+- `SteamMMO_0.0017.zip` -- 45616012 bytes -- sha256 `4e089764504eb8ee71e86ea46b305139667ba09e745e44a78cce298b70108f2f` (Windows)
+- `SteamMMO_0.0017_macos.zip` -- 67457867 bytes -- sha256 `e39d2f984a25576f49c17c12accc91ab685dc47793d14bd5f89cfc988aecd8da` (macOS)
+- `build/web/` --  46M -- Web/HTML5, built from the same tree
+
