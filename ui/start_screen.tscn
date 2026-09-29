@@ -48,6 +48,33 @@ theme_override_font_sizes/font_size = 13
 text = "Steam: -"
 horizontal_alignment = 1
 
+[node name="SteamBanner" type="PanelContainer" parent="Center/Panel/VBox"]
+unique_name_in_owner = true
+visible = false
+
+[node name="BannerBox" type="VBoxContainer" parent="Center/Panel/VBox/SteamBanner"]
+theme_override_constants/separation = 6
+
+[node name="SteamProblem" type="Label" parent="Center/Panel/VBox/SteamBanner/BannerBox"]
+unique_name_in_owner = true
+theme_override_colors/font_color = Color(1, 0.827451, 0.545098, 1)
+theme_override_font_sizes/font_size = 13
+text = "Steam is not available."
+autowrap_mode = 3
+
+[node name="BannerRow" type="HBoxContainer" parent="Center/Panel/VBox/SteamBanner/BannerBox"]
+theme_override_constants/separation = 8
+
+[node name="OpenSteamButton" type="Button" parent="Center/Panel/VBox/SteamBanner/BannerBox/BannerRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(270, 0)
+text = "Open Steam"
+
+[node name="SteamRetryButton" type="Button" parent="Center/Panel/VBox/SteamBanner/BannerBox/BannerRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(270, 0)
+text = "Retry Steam"
+
 [node name="Sep1" type="HSeparator" parent="Center/Panel/VBox"]
 
 [node name="PlayButton" type="Button" parent="Center/Panel/VBox"]

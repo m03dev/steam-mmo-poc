@@ -7,12 +7,17 @@ extends Control
 ## loads a level itself.
 
 const GAME_SCENE: String = "res://scenes/Main.tscn"
+# Loaded by path rather than reached through the autoload instance, because the sentence below is a
+# static function and calling it on an instance is a warning.
+const STEAM_MANAGER := preload("res://autoload/SteamManager.gd")
 
 @onready var _identity: Label = %Identity
 @onready var _status: Label = %Status
 @onready var _lobby_id_input: LineEdit = %LobbyIdInput
 @onready var _join_button: Button = %JoinButton
 @onready var _direct_address_input: LineEdit = %DirectAddressInput
+@onready var _steam_banner: PanelContainer = %SteamBanner
+@onready var _steam_problem: Label = %SteamProblem
 
 ## Set from the command line, then consumed once Steam is ready. See
 ## _read_launch_action().
@@ -29,6 +34,10 @@ func _ready() -> void:
 	%DirectJoinButton.pressed.connect(_join_direct)
 	%OfflineButton.pressed.connect(_enter_game)
 	%QuitButton.pressed.connect(get_tree().quit)
+	# The two ways out of a failed Steam start, both live from the menu: open the client the
+	# player probably has not started, and try again without relaunching the game.
+	%OpenSteamButton.pressed.connect(SteamManager.open_steam_client)
+	%SteamRetryButton.pressed.connect(SteamManager.retry)
 
 	NetworkManager.lobby_created.connect(_on_lobby_ready)
 	NetworkManager.lobby_joined.connect(_on_lobby_ready)
@@ -96,27 +105,56 @@ func _run_launch_action() -> void:
 ## and there is no "no servers found" state to explain. The buttons below it are
 ## the deliberate overrides.
 func _play() -> void:
+	if not _steam_ready():
+		return
 	_set_status("Looking for an open world...")
 	NetworkManager.auto_join_first_open(NetworkManager.TYPE_WORLD)
 
 
 func _host(lobby_type: String) -> void:
+	if not _steam_ready():
+		return
 	_set_status("Creating a public '%s' lobby..." % lobby_type)
 	NetworkManager.create_lobby(lobby_type)
 
 
 func _auto_join(lobby_type: String) -> void:
+	if not _steam_ready():
+		return
 	_set_status("Looking for an open '%s' lobby..." % lobby_type)
 	NetworkManager.auto_join_first_open(lobby_type)
 
 
 func _on_join_pressed() -> void:
+	if not _steam_ready():
+		return
 	var text: String = _lobby_id_input.text.strip_edges()
 	if not text.is_valid_int():
 		_set_status("Enter a numeric Lobby ID first.")
 		return
 	_set_status("Joining lobby %s..." % text)
 	NetworkManager.join_lobby(int(text))
+
+
+## Whether a Steam-backed action can run, and the whole point of the fix.
+##
+## These buttons used to be DISABLED when Steam was not up, which is a dead end that teaches
+## nobody anything: a friend whose Steam app was closed (being signed in to Steam in a browser is
+## not the Steam client) saw five grey buttons and the sentence "Steam is offline - direct IP and
+## offline play still work." Now every button stays pressable and answers with the real cause and
+## the two things that fix it. A button that cannot work should say so, not vanish.
+func _steam_ready() -> bool:
+	if SteamManager.is_initialized:
+		return true
+	_show_steam_banner()
+	return false
+
+
+func _show_steam_banner() -> void:
+	_steam_banner.visible = true
+	_steam_problem.text = SteamManager.problem_hint if not SteamManager.problem_hint.is_empty() \
+			else STEAM_MANAGER.start_problem(true, SteamManager.steam_client_running(), "")
+	_set_status(_steam_problem.text)
 
 
 ## Host a direct-IP session: plain ENet, no Steam, no lobby. This is the path for
@@ -202,20 +240,26 @@ func _enter_game() -> void:
 
 
 func _on_steam_initialized(success: bool) -> void:
-	# Without Steam there is nothing to host or join with, so lock the network
-	# controls and leave offline play as the way in.
-	for button: Button in [%PlayButton, %HostWorldButton, %HostDungeonButton,
-			%AutoDungeonButton, _join_button]:
-		button.disabled = not success
-	_lobby_id_input.editable = success
-	# The direct-IP controls are NOT gated on Steam -- they exist for people who have
-	# no Steam at all. They are gated on the platform instead: a browser cannot open
-	# a raw UDP socket, so ENet cannot exist in a web build, and offering it there
-	# would be a button that can never work.
+	# Direct-IP sessions are NOT gated on Steam -- they exist for people who have no Steam at all.
+	# They are gated on the platform instead: a browser cannot open a raw UDP socket, so ENet
+	# cannot exist in a web build, and offering it there would be a button that can never work.
 	var web_build: bool = OS.has_feature("web")
 	%DirectHostButton.disabled = web_build
 	%DirectJoinButton.disabled = web_build
 	_direct_address_input.editable = not web_build
+
+	# Every Steam-backed button STAYS ENABLED either way. A disabled button cannot explain
+	# itself, and the reason Steam is unavailable is the one thing the player needs to know.
+	for button: Button in [%PlayButton, %HostWorldButton, %HostDungeonButton,
+			%AutoDungeonButton, _join_button]:
+		button.disabled = false
+	_lobby_id_input.editable = true
+
+	if success:
+		_steam_banner.visible = false
+	else:
+		_show_steam_banner()
+
 	if web_build:
 		_set_status("Browser build: single-player only (Play Offline). Steam and "
 				+ "direct-IP multiplayer need a downloaded desktop build.")
@@ -226,7 +270,8 @@ func _on_steam_initialized(success: bool) -> void:
 			_set_status("Joining a friend (lobby %d)..." % NetworkManager.requested_lobby_id)
 			NetworkManager.join_lobby(NetworkManager.requested_lobby_id)
 			return
-		_set_status("PLAY joins the open world, or opens one if nobody is playing.")
+		if not web_build:
+			_set_status("PLAY joins the open world, or opens one if nobody is playing.")
 		if NetworkManager.lobby_visibility == NetworkManager.LobbyVisibility.FRIENDS_ONLY:
 			# On a friends-only app the lobby list cannot see a friend's session, so
 			# say how to get into one instead of letting PLAY quietly open a second.
@@ -234,8 +279,7 @@ func _on_steam_initialized(success: bool) -> void:
 					+ "friends list, or by pasting the lobby id.")
 		_run_launch_action()
 	else:
-		_set_status("Steam is offline - direct IP and offline play still work.")
-		# Neither of these needs Steam, so either can still start.
+		# Offline and direct play need no Steam, so a command-line launch of either still runs.
 		if _launch_action == "--offline" or _launch_action == "--host-direct" \
 				or _launch_action.begins_with("--join-direct"):
 			_run_launch_action()
