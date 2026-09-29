@@ -200,7 +200,7 @@ if [ "$ok" -eq 0 ]; then echo "!! at least one push failed" >&2; exit 1; fi
 cat <<REMINDERS
 
 ==> After a real push, confirm what the page actually SERVES (not what we sent):
-	  $BUTLER fetch $ITCH_USER/$SLUG:osx --dest /tmp/itch_fetched
+	  $BUTLER fetch $ITCH_USER/$SLUG:osx /tmp/itch_fetched
       shasum -a 256 /tmp/itch_fetched/*.zip     # must equal the VERSIONS.md sha
       unzip -l /tmp/itch_fetched/*.zip | head   # the .app must still be inside
 
