@@ -121,9 +121,13 @@ Steam is optional: multiplayer works over a Steam lobby, or over plain IP with n
 account at all (the host needs UDP port 23460 reachable — LAN as-is, or forwarded for wider
 internet play).
 
-macOS note: the app is unsigned, so on first launch macOS may refuse to open it. Either
-right-click the app and choose Open, or run:
-    xattr -dr com.apple.quarantine SteamMMO.app
+macOS note -- one-time step, and it is Apple's rule, not a broken download. After
+unzipping, **drag SteamMMO.app into Applications first** (macOS runs apps left in Downloads
+from a random read-only location). Then the first launch says *"Apple could not verify
+SteamMMO is free of malware"*: click **Done**, then open **System Settings -> Privacy &
+Security**, scroll down and click **Open Anyway** for SteamMMO. Every launch after that is
+normal. Right-click -> Open is NOT enough on current macOS, and the one-command alternative is:
+    xattr -dr com.apple.quarantine /Applications/SteamMMO.app
 ```
 
 ## Cover and screenshots

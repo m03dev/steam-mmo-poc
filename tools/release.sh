@@ -65,7 +65,13 @@ if strings -a "$BUILD_DIR/SteamMMO.exe" | grep -qE "hostfxr|CoreCLR"; then
 	echo "   (a .NET template needs a runtime a stranger's Windows box may not have)" >&2
 	exit 1
 fi
-echo "==> Windows engine verified plain, no .NET dependency (built by $(basename "$(dirname "$(dirname "$(dirname "$(dirname "$WIN_GODOT")")")")"))")"
+win_engine_app=""
+if [ -n "$WIN_GODOT" ]; then
+	# ".../Godot.app/Contents/MacOS/Godot" -> "Godot.app", said out loud so a release log
+	# shows WHICH editor produced the Windows build without anyone having to read the path.
+	win_engine_app="$(basename "$(dirname "$(dirname "$(dirname "$WIN_GODOT")")")")"
+fi
+echo "==> Windows engine verified plain, no .NET dependency (built by ${win_engine_app:-$WIN_GODOT})"
 
 # --- Steam App ID --------------------------------------------------------------
 # The build runs as the App ID in steam_appid.txt, and SteamManager reads the copy

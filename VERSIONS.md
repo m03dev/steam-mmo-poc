@@ -86,3 +86,10 @@ different size, and that is the quickest way to catch it.
 - `SteamMMO_0.0013_macos.zip` -- 66565628 bytes -- sha256 `47418d240ab125a35ee3d72ead7691657ad91f954fdbb30eb55b72433840b012` (macOS)
 - `build/web/` --  46M -- Web/HTML5, built from the same tree
 
+## 0.0014 -- 2026-09-28 21:58
+
+- remote player animations + host migration (the session survives its host) + the parked announce-grace fix
+- `SteamMMO_0.0014.zip` -- 44726890 bytes -- sha256 `3b13e6dd06e6e04287da33d23b96c2cc5745497401099d38891fca990747365b` (Windows)
+- `SteamMMO_0.0014_macos.zip` -- 66573012 bytes -- sha256 `1ace5dd5ccc6561654b121c0b3983d3a933a3ff602ddf44a1e65805d709b8ed1` (macOS)
+- `build/web/` --  46M -- Web/HTML5, built from the same tree
+
