@@ -102,3 +102,10 @@ different size, and that is the quickest way to catch it.
 - `SteamMMO_0.0015_macos.zip` -- 67065443 bytes -- sha256 `b720b1ecad5c75e081c6480932233f3086d2549467129197b6e24877185fb18d` (macOS)
 - `build/web/` --  46M -- Web/HTML5, built from the same tree
 
+## 0.0016 -- 2026-09-29 00:03
+
+- Front door fixed (no more dead buttons), a real server list of open worlds, and the 1v1 arena
+- `SteamMMO_0.0016.zip` -- 45614810 bytes -- sha256 `80fb206700082dd6400c976ae1341b867622061eb53107d8d609e3694bfd222e` (Windows)
+- `SteamMMO_0.0016_macos.zip` -- 67456249 bytes -- sha256 `80ce5bda8c26f0b15ca70da73dae79bea7eed2a44e886aa9478202a48fe87d47` (macOS)
+- `build/web/` --  46M -- Web/HTML5, built from the same tree
+
